@@ -1,0 +1,30 @@
+# === 敏感数据：绝不提交（对应 CLAUDE.md 关键约束）===
+# 凭据 / 登录态
+credentials.json
+credentials/
+*.credentials.json
+secrets/
+.env
+.env.*
+
+# 用户信息（bio）与个人简历
+bio.json
+bio/
+resumes/
+*.resume.pdf
+cover-letters/
+
+# 投递记录与运行日志（含填表内容，可能带个人信息）
+deliver-records/
+logs/
+*.log
+
+# Claude Code 本地个人设置
+.claude/settings.local.json
+
+# === 通用 ===
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
