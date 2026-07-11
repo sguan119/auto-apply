@@ -1,0 +1,148 @@
+{
+  "$defs": {
+    "DeliveryStatus": {
+      "description": "单职位投递状态机的状态集合（spec 决策六）。\n\nPENDING → OPENING → AUTHENTICATING → FILLING ⇄ WAITING_USER →\nREADY_TO_SUBMIT（仅手动模式停留）→ SUBMITTING → CONFIRMING → SUCCEEDED；\n任意阶段失败 → FAILED；WAITING_USER 超时 → SUSPENDED（非终态，可恢复重投）。",
+      "enum": [
+        "pending",
+        "opening",
+        "authenticating",
+        "filling",
+        "waiting_user",
+        "ready_to_submit",
+        "submitting",
+        "confirming",
+        "succeeded",
+        "failed",
+        "suspended"
+      ],
+      "title": "DeliveryStatus",
+      "type": "string"
+    },
+    "FieldValueSource": {
+      "description": "表单字段填入值的来源（spec 决策五 FilledField 注释）。",
+      "enum": [
+        "bio",
+        "llm_generated",
+        "user_answer"
+      ],
+      "title": "FieldValueSource",
+      "type": "string"
+    },
+    "FilledField": {
+      "description": "FILLING 阶段填入的单个表单字段记录（spec 决策五 DeliveryRecord 注释）。",
+      "properties": {
+        "question": {
+          "title": "Question",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "string"
+        },
+        "value_source": {
+          "$ref": "#/$defs/FieldValueSource"
+        }
+      },
+      "required": [
+        "question",
+        "value",
+        "value_source"
+      ],
+      "title": "FilledField",
+      "type": "object"
+    },
+    "JobRef": {
+      "description": "搜索模块输出中 deliver 依赖的子集（spec 决策五）。唯一键 = (platform, job_id)。",
+      "properties": {
+        "platform": {
+          "title": "Platform",
+          "type": "string"
+        },
+        "job_id": {
+          "title": "Job Id",
+          "type": "string"
+        },
+        "url": {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "company": {
+          "title": "Company",
+          "type": "string"
+        },
+        "score": {
+          "title": "Score",
+          "type": "number"
+        }
+      },
+      "required": [
+        "platform",
+        "job_id",
+        "url",
+        "title",
+        "company",
+        "score"
+      ],
+      "title": "JobRef",
+      "type": "object"
+    }
+  },
+  "description": "deliver 的输出：一次投递的结果记录（PRD 八 / spec 决策五）。",
+  "properties": {
+    "job": {
+      "$ref": "#/$defs/JobRef"
+    },
+    "status": {
+      "$ref": "#/$defs/DeliveryStatus"
+    },
+    "filled_fields": {
+      "items": {
+        "$ref": "#/$defs/FilledField"
+      },
+      "title": "Filled Fields",
+      "type": "array"
+    },
+    "failure_reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Failure Reason"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "started_at": {
+      "format": "date-time",
+      "title": "Started At",
+      "type": "string"
+    },
+    "finished_at": {
+      "format": "date-time",
+      "title": "Finished At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "job",
+    "status",
+    "run_id",
+    "started_at",
+    "finished_at"
+  ],
+  "title": "DeliveryRecord",
+  "type": "object"
+}

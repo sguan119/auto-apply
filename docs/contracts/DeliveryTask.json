@@ -1,0 +1,76 @@
+{
+  "$defs": {
+    "JobRef": {
+      "description": "搜索模块输出中 deliver 依赖的子集（spec 决策五）。唯一键 = (platform, job_id)。",
+      "properties": {
+        "platform": {
+          "title": "Platform",
+          "type": "string"
+        },
+        "job_id": {
+          "title": "Job Id",
+          "type": "string"
+        },
+        "url": {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "company": {
+          "title": "Company",
+          "type": "string"
+        },
+        "score": {
+          "title": "Score",
+          "type": "number"
+        }
+      },
+      "required": [
+        "platform",
+        "job_id",
+        "url",
+        "title",
+        "company",
+        "score"
+      ],
+      "title": "JobRef",
+      "type": "object"
+    }
+  },
+  "description": "deliver 的输入：一个待投职位 + 为它定制的材料（spec 决策五）。",
+  "properties": {
+    "job": {
+      "$ref": "#/$defs/JobRef"
+    },
+    "resume_pdf": {
+      "format": "path",
+      "title": "Resume Pdf",
+      "type": "string"
+    },
+    "cover_letter_pdf": {
+      "anyOf": [
+        {
+          "format": "path",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cover Letter Pdf"
+    }
+  },
+  "required": [
+    "job",
+    "resume_pdf"
+  ],
+  "title": "DeliveryTask",
+  "type": "object"
+}

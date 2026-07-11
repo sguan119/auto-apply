@@ -1,0 +1,65 @@
+# config.example.toml —— 非密钥行为配置模板（spec 决策十）
+#
+# 复制为 config.toml 后按需修改；config.toml 已被 .gitignore 排除，不会入仓库。
+# 密钥（LLM_API_KEY / CAPSOLVER_API_KEY / IMAP 密码等）不放这里，见 .env.example。
+
+[deliver]
+# 投递模式：manual（默认，逐职位在 READY_TO_SUBMIT 停下等确认）/ auto（自动提交）
+mode = "manual"
+# 遇阻问询（WAITING_USER）等待用户回答的超时时间，单位秒；超时该职位转 SUSPENDED，继续投下一个
+question_timeout = 1800
+# Easy Apply（LinkedIn）滚动 24 小时投递上限；到顶转官网投递或排队次日（当前 Workday-only MVP 暂不触发）
+easy_apply_daily_limit = 50
+# 密码生成方式：random（随机生成）/ template（按模板规则生成），用于 AUTHENTICATING 自动注册
+password_generation_mode = "random"
+# template 模式用的密码模板，"{rand}" 会被替换成随机字母数字串；random 模式忽略此项
+password_template = "Deliver{rand}!2026"
+
+[llm]
+# 无头 CLI 子进程调用命令（决策四：LLM 客户端首个实现走 headless CLI）。
+#
+# ⚠️ 关键约束：命令必须在 stdout 上输出【原始 PageDecision JSON】——即那一个
+# {"decisions": [...], "next_action": ...} 对象本身（可选用 ```json 代码块
+# 包裹，允许前后夹带解释性文字，解析器会抠出对象）。**不能**是把决策再套一层
+# 的「agent 信封」。特别注意：`claude -p --output-format json` 输出的是 Claude
+# Code 的结果信封 {"type":"result","result":"...(决策 JSON 被转义成字符串)..."}，
+# 决策 JSON 被藏进 result 字符串里、顶层没有 decisions/next_action 字段，
+# 解析器会拒收 → 每一页都 llm_decision_error。所以默认用不带 --output-format
+# 的 `claude -p`：它直接把模型的文本回复打到 stdout，而系统提示已经要求模型
+# 只回一个 PageDecision JSON 对象，正好符合上面的约束。换任何别的 CLI
+# （Gemini CLI、本地模型包装脚本等）同理——只要它的 stdout 是原始决策 JSON 即可。
+#
+# 命令字符串里若含 "{model}" 占位符会被下面的 model 值替换，例如
+# command = "claude -p --model {model}"；不含占位符时 model 仍会通过环境变量
+# LLM_MODEL 传给子进程，具体怎么用取决于 command 本身。
+command = "claude -p"
+# 模型名，随 command 一起传给 CLI（见上）
+model = "claude-opus-4-8"
+# 可选：可插拔 LLM 的自定义 endpoint（决策十 model+base_url+key），非密钥，
+# 按需通过环境变量 LLM_BASE_URL 透传给 CLI 子进程；留空表示用 command 自身默认值
+# base_url = ""
+# decide() 单次调用超时秒数，CLI 子进程卡死时避免整个 run 被拖死
+timeout = 60
+
+[browser]
+# 无头运行；调试时可改 false 用有头浏览器观察 Playwright 实际操作（决策三）
+headless = true
+# 持久化 profile 目录（cookie/登录态复用），相对路径按仓库根解析；落在 data/ 下随其被 gitignore 排除
+user_data_dir = "data/browser_profile"
+
+[imap]
+# 只读邮箱，用于自动取回注册验证码/验证链接（PRD 六）
+host = "imap.gmail.com"
+port = 993
+# 只读 SELECT/EXAMINE 的邮箱文件夹
+mailbox = "INBOX"
+# fetch_code/fetch_link 轮询间隔与总超时（秒），超时降级（PRD 五：不阻塞整体流程）
+poll_interval = 5.0
+poll_timeout = 120.0
+
+[capsolver]
+# CapSolver 打码服务（决策六子步骤：识别类型+sitekey → createTask → poll → 注入）
+# 密钥 CAPSOLVER_API_KEY 走环境变量/.env，不放这里；未配置时验证码优雅失败（PRD 五）
+base_url = "https://api.capsolver.com"
+poll_interval = 2.0
+poll_timeout = 120.0

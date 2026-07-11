@@ -1,0 +1,131 @@
+{
+  "$defs": {
+    "JobRef": {
+      "description": "搜索模块输出中 deliver 依赖的子集（spec 决策五）。唯一键 = (platform, job_id)。",
+      "properties": {
+        "platform": {
+          "title": "Platform",
+          "type": "string"
+        },
+        "job_id": {
+          "title": "Job Id",
+          "type": "string"
+        },
+        "url": {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "company": {
+          "title": "Company",
+          "type": "string"
+        },
+        "score": {
+          "title": "Score",
+          "type": "number"
+        }
+      },
+      "required": [
+        "platform",
+        "job_id",
+        "url",
+        "title",
+        "company",
+        "score"
+      ],
+      "title": "JobRef",
+      "type": "object"
+    },
+    "Question": {
+      "description": "遇阻问询的问题载体（spec 决策七）。按页批量抛出，携带职位上下文以便汇总。",
+      "properties": {
+        "job": {
+          "$ref": "#/$defs/JobRef"
+        },
+        "field_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Field Path"
+        },
+        "question": {
+          "title": "Question",
+          "type": "string"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Page"
+        }
+      },
+      "required": [
+        "job",
+        "question"
+      ],
+      "title": "Question",
+      "type": "object"
+    }
+  },
+  "description": "一次 run 结束后的汇总（spec 决策八）：总数/成功/失败按原因分组/挂起+未答问题清单。",
+  "properties": {
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "total": {
+      "title": "Total",
+      "type": "integer"
+    },
+    "succeeded": {
+      "title": "Succeeded",
+      "type": "integer"
+    },
+    "failed_by_reason": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "title": "Failed By Reason",
+      "type": "object"
+    },
+    "suspended": {
+      "items": {
+        "$ref": "#/$defs/JobRef"
+      },
+      "title": "Suspended",
+      "type": "array"
+    },
+    "unanswered_questions": {
+      "items": {
+        "$ref": "#/$defs/Question"
+      },
+      "title": "Unanswered Questions",
+      "type": "array"
+    }
+  },
+  "required": [
+    "run_id",
+    "total",
+    "succeeded"
+  ],
+  "title": "RunSummary",
+  "type": "object"
+}

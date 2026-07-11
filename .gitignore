@@ -6,6 +6,8 @@ credentials/
 secrets/
 .env
 .env.*
+# 但密钥模板必须能提交（spec 决策十要求仓库提供 .env.example）
+!.env.example
 
 # 用户信息（bio）与个人简历
 bio.json
@@ -14,10 +16,14 @@ resumes/
 *.resume.pdf
 cover-letters/
 
-# 投递记录与运行日志（含填表内容，可能带个人信息）
+# 投递记录与运行日志（含填表内容，可能带个人信息）—— spec 决策九：data/、logs/、.env 绝不入仓库
+data/
 deliver-records/
 logs/
 *.log
+
+# 用户本地真实配置：仓库只提交 config.example.toml 模板，用户复制成 config.toml 后本地维护
+config.toml
 
 # Claude Code 本地个人设置
 .claude/settings.local.json
@@ -28,3 +34,9 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# === Python ===
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/

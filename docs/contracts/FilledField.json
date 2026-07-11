@@ -1,0 +1,35 @@
+{
+  "$defs": {
+    "FieldValueSource": {
+      "description": "表单字段填入值的来源（spec 决策五 FilledField 注释）。",
+      "enum": [
+        "bio",
+        "llm_generated",
+        "user_answer"
+      ],
+      "title": "FieldValueSource",
+      "type": "string"
+    }
+  },
+  "description": "FILLING 阶段填入的单个表单字段记录（spec 决策五 DeliveryRecord 注释）。",
+  "properties": {
+    "question": {
+      "title": "Question",
+      "type": "string"
+    },
+    "value": {
+      "title": "Value",
+      "type": "string"
+    },
+    "value_source": {
+      "$ref": "#/$defs/FieldValueSource"
+    }
+  },
+  "required": [
+    "question",
+    "value",
+    "value_source"
+  ],
+  "title": "FilledField",
+  "type": "object"
+}
