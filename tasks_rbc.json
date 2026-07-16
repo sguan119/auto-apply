@@ -1,0 +1,14 @@
+[
+  {
+    "job": {
+      "platform": "workday",
+      "job_id": "R-0000167842-3",
+      "url": "https://rbc.wd3.myworkdayjobs.com/en-US/RBCEARLYTALENT1/job/Chicago-Illinois-United-States-of-America/Customer-Service-Representative---Futures-Clearing-Analyst_R-0000167842-3",
+      "title": "Customer Service Representative - Futures Clearing Analyst",
+      "company": "RBC",
+      "score": 1.0
+    },
+    "resume_pdf": "data/artifacts/workday/R-0000167842-3/resume.pdf",
+    "cover_letter_pdf": null
+  }
+]

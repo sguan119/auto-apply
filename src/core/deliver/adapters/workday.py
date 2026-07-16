@@ -168,18 +168,27 @@ class WorkdayAdapter(PlatformAdapter):
         run_logger: RunLogger | None = None,
     ) -> OpenResult:
         page = browser.goto(str(job.url))
+        # Workday 是 SPA：goto 的 load 事件早于 React 把 Apply 按钮 / 「Start Your
+        # Application」模态框 / 门禁页渲染出来。不等它落地就扫描，会看到半空 DOM
+        # → 点不到 Apply、误判 on_form（真实 RBC 页面实测暴露）。每次可能触发动态
+        # 渲染的动作后都最佳努力等 networkidle。
+        _wait_for_spa_settle(page)
 
         outcome = handle_captcha_if_present(page, settings, run_logger)
         if outcome == "failed":
             return OpenResult(outcome="failed", reason="captcha_unsolved")
 
         _dismiss_cookie_banner(page)
+        _wait_for_spa_settle(page)
 
         for _ in range(_MAX_APPLY_CLICKS):
             if self.needs_auth(page):
                 return OpenResult(outcome="needs_auth")
             if not _click_apply_like_button(page):
                 break
+            # Apply / Apply Manually 点击常触发 SPA 局部渲染（模态框、门禁页、
+            # 表单）而非整页导航——等它落地再进入下一轮扫描。
+            _wait_for_spa_settle(page)
 
         outcome = handle_captcha_if_present(page, settings, run_logger)
         if outcome == "failed":
@@ -239,6 +248,24 @@ class WorkdayAdapter(PlatformAdapter):
 # ---------------------------------------------------------------------------
 # 内部辅助：关键词启发式（不经 LLM，理由见模块文档）
 # ---------------------------------------------------------------------------
+
+
+def _SPA_SETTLE_TIMEOUT_MS() -> int:
+    return 15000
+
+
+def _wait_for_spa_settle(page: Page) -> None:
+    """最佳努力等 SPA 动态内容落地（networkidle）；等不到也不阻塞——超时/无此
+    能力（如测试里的 set_content 页面）都静默返回，不影响后续启发式扫描。
+
+    理由见 `open_application`：Workday 的 load 事件早于 Apply 按钮/模态框/门禁页
+    渲染，不等就扫描会看到半空 DOM。networkidle 而非手写 sleep（决策三：依赖
+    Playwright 自动等待）；set_content 页面本就无 pending 请求，会立即返回。
+    """
+    try:
+        page.wait_for_load_state("networkidle", timeout=_SPA_SETTLE_TIMEOUT_MS())
+    except PlaywrightError:
+        pass
 
 
 def _safe_inner_text(page: Page) -> str:
