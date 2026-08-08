@@ -1,68 +1,68 @@
-# PRD —— 全自动投递脚本
+# PRD — AutoApply
 
-> 开源项目。求职全流程自动化：**搜索职位 → 改写简历 → 自动投递**。
-> 本文档只描述「做什么」，不描述「怎么实现」（架构待功能定稿后再议）。
+> Open-source project. End-to-end automation of the job search: **search jobs → tailor résumé → auto-apply**.
+> This document only describes *what* to build, not *how* to build it (architecture is discussed once functionality is settled).
 
-## 一、整体形态
+## 1. Overall Shape
 
-- 三大功能模块 + 一个共享的**用户信息模块**。
-- 模块间高度独立，只通过数据契约交互。
-- 优先级：先 CLI，跑通一条端到端链路。
+- Three functional modules plus one shared **bio module**.
+- Modules are highly independent and interact only through data contracts.
+- Priority: CLI first, to get one end-to-end path working.
 
 ```
         ┌─────────────────────────────┐
-        │      用户信息模块 (bio)        │  ← 单一事实源，三模块共享
+        │      bio module (bio)        │  ← single source of truth, shared by all three modules
         └─────────────────────────────┘
               ▲           ▲          ▲
-              │           │          │(不确定字段回写)
+              │           │          │(writes back uncertain fields)
         ┌─────┴───┐ ┌─────┴───┐ ┌────┴────┐
-        │  搜索   │→│ 改简历  │→│  投递   │
+        │ search  │→│ resume  │→│ deliver │
         └─────────┘ └─────────┘ └─────────┘
 ```
 
-## 二、用户信息模块（bio）
+## 2. Bio Module (bio)
 
-- 三个模块共享的中心数据，系统的**单一事实源**。
-- 存放求职者的全部信息：基本信息、教育、经历、技能、求职偏好等。
-- **可被投递模块回写**：投递时遇到不确定/缺失的字段，问用户，用户的回答补回 bio，下次不再问。
+- The central data shared by all three modules — the system's **single source of truth**.
+- Holds all of the job seeker's information: basic info, education, experience, skills, job preferences, and more.
+- **Can be written back to by the deliver module**: when delivery hits an uncertain or missing field, it asks the user, and the answer is written back into bio so it never has to ask again.
 
-## 三、搜索模块
+## 3. Search Module
 
-- 用开源库 **[JobSpy](https://github.com/speedyapply/JobSpy)** 抓取职位。
-- **平台范围：仅北美**（JobSpy 支持的 LinkedIn / Indeed / ZipRecruiter / Glassdoor 等）。
-- 搜索条件来自 **bio 里的求职偏好**，可设多组。
-- **触发方式**：手动跑一次，或常驻定时跑。**用户可设置搜索频率（每隔多久搜一次）。**
-- **去重**：已搜过 / 已投过的职位自动跳过。
+- Uses the open-source library **[JobSpy](https://github.com/speedyapply/JobSpy)** to scrape job postings.
+- **Platform scope: North America only** (LinkedIn / Indeed / ZipRecruiter / Glassdoor, etc., as supported by JobSpy).
+- Search criteria come from **the job preferences in bio**; multiple preference sets can be configured.
+- **Trigger**: run manually once, or run continuously on a schedule. **Users can configure the search interval (how often to search).**
+- **Deduplication**: jobs that have already been searched or already applied to are automatically skipped.
 
-### 两层设计（核心）
+### Two-Layer Design (core)
 
-job board 自身的搜索很不准，容易漏掉匹配的工作。所以分两层，目标是**高召回**（宁可多、不可漏）：
+Job boards' own search is quite inaccurate and easily misses matching jobs. So this is split into two layers, aiming for **high recall** (better to over-include than to miss one):
 
-1. **第一层 · 搜索（拉高召回）**：用**特别宽松**的条件向各平台搜，把候选职位尽量多地聚拢回来，绝不在这一步漏掉好工作。
-2. **第二层 · 过滤（自己的算法）**：对聚拢来的职位用我们自己的算法过滤 + 打分。原则同样是**宁可错，不可漏（高召回，容忍低精确）**。
-   - **按阈值筛选**：只有高于阈值的职位进入改简历 + 投递，**按分数从高到低顺序投递**。
-   - 阈值由用户设置。
-   - 打分/过滤的具体算法**待定**（LLM / 规则 / 混合），但**要求成本可控**（定时跑量大，不能烧钱）。
+1. **Layer 1 · Search (maximize recall)**: query each platform with **deliberately loose** criteria to pull in as many candidate jobs as possible, never missing a good job at this step.
+2. **Layer 2 · Filter (our own algorithm)**: filter and score the pooled jobs with our own algorithm. Same principle — **better wrong than missing (high recall, tolerate low precision)**.
+   - **Threshold filtering**: only jobs scoring above the threshold go on to resume tailoring + delivery, **applied to in descending score order**.
+   - The threshold is user-configurable.
+   - The exact scoring/filtering algorithm is **TBD** (LLM / rules / hybrid), but **cost must be controllable** (this runs on a schedule at volume, so it can't burn money).
 
-- 输出：带评分的职位列表（标记哪些高于阈值）。
+- Output: a scored job list (flagging which ones are above the threshold).
 
-## 四、改简历模块
+## 4. Resume Module
 
-- 输入：单个职位（JD）+ 用户 bio。
-- **针对每个 JD 重写**简历（不是套模板，是定制化改写）。
-- **LLM 后端可插拔**：支持任意 LLM API，也支持通过 LLM CLI 调用。（具体哪家未定，要求架构上不绑死。）
-- 输出：**改好的 Cover Letter + Resume PDF**。
+- Input: a single job (JD) + the user's bio.
+- **Rewrites the résumé for each JD** (not a template fill — a genuine per-job rewrite).
+- **Pluggable LLM backend**: supports any LLM API, and also supports invocation through an LLM CLI. (The specific provider is undecided; the architecture must not lock in one.)
+- Output: **a tailored cover letter + résumé PDF**.
 
-## 五、投递模块
+## 5. Deliver Module
 
-- **无人值守，遇阻才问**：默认全自动跑，不打断用户；只有遇到拿不准的字段时才停下来问。
-- 按搜索模块给出的顺序（分数从高到低）逐个投递。
-- 投递动作：上传简历附件 + 填写表单。简历附件用改简历模块为该 JD 生成的那份 PDF。
-- **详细需求已拆分为独立文档：[docs/deliver-prd.md](docs/deliver-prd.md)**（投递范围、读页面与填表技术方案、字段处理规则、运行模式、记录与并发、待敲定事项）。
+- **Unattended, ask only when blocked**: runs fully automated by default and never interrupts the user; it only stops to ask when it hits a field it can't confidently fill.
+- Applies to jobs in the order given by the search module (descending score).
+- Delivery actions: uploading résumé attachments + filling out forms. The résumé attachment is the PDF the resume module generated for that specific JD.
+- **Detailed requirements have been split into their own document: [docs/deliver-prd.md](docs/deliver-prd.md)** (delivery scope, the technical approach to reading pages and filling forms, field-handling rules, run modes, records and concurrency, open items).
 
-## 六、暂不做 / 待定
+## 6. Not Doing Yet / TBD
 
-- 平台适配：先打通一个平台的端到端链路，其余后加。
-- 改简历模块的具体 LLM 选型与 PDF 生成方式：待定。
-- 投递追踪（已读/回复/面试邀请）：暂不做。
-- Website、Docker 发布：CLI 跑通后再说。
+- Platform adapters: get one platform working end-to-end first; add the rest later.
+- The resume module's specific LLM choice and PDF-generation approach: TBD.
+- Delivery tracking (read receipts/replies/interview invites): not doing yet.
+- Website, Docker release: after the CLI is working end-to-end.
