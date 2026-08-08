@@ -1,9 +1,14 @@
 # === 敏感数据：绝不提交（对应 CLAUDE.md 关键约束）===
+#
+# 目录规则一律用 `/` 前缀锚定到仓库根。不锚定的 `bio/` 会匹配**任意层级**的同名
+# 目录，曾把源码包 `src/core/bio/` 整个吞掉（CI 在 Linux 上 ModuleNotFoundError
+# 才暴露）。用户数据都在仓库根，锚定后既不漏，也不会再误伤同名源码包。
+#
 # 凭据 / 登录态
 credentials.json
-credentials/
 *.credentials.json
-secrets/
+/credentials/
+/secrets/
 .env
 .env.*
 # 但密钥模板必须能提交（spec 决策十要求仓库提供 .env.example）
@@ -11,15 +16,15 @@ secrets/
 
 # 用户信息（bio）与个人简历
 bio.json
-bio/
-resumes/
+/bio/
+/resumes/
 *.resume.pdf
-cover-letters/
+/cover-letters/
 
 # 投递记录与运行日志（含填表内容，可能带个人信息）—— spec 决策九：data/、logs/、.env 绝不入仓库
-data/
-deliver-records/
-logs/
+/data/
+/deliver-records/
+/logs/
 *.log
 
 # 用户本地真实配置：仓库只提交 config.example.toml 模板，用户复制成 config.toml 后本地维护
