@@ -25,6 +25,10 @@ logs/
 # 用户本地真实配置：仓库只提交 config.example.toml 模板，用户复制成 config.toml 后本地维护
 config.toml
 
+# 真实投递任务清单（含具体职位 URL / 公司，属个人求职记录）：仓库只提交 tasks.example.json 模板
+tasks*.json
+!tasks.example.json
+
 # Claude Code 本地个人设置
 .claude/settings.local.json
 
