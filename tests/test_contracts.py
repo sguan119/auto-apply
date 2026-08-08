@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from core.contracts import (
+from autoapply.core.contracts import (
     Answer,
     BioWriteback,
     DeliveryRecord,

@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 from playwright.sync_api import sync_playwright
 
-from core.deliver.dom import collect_page
+from autoapply.core.deliver.dom import collect_page
 
 
 @pytest.fixture(scope="module")

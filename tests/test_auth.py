@@ -17,11 +17,11 @@ from typing import Any
 import pytest
 from playwright.sync_api import sync_playwright
 
-from core.config import DeliverSettings, Settings
-from core.contracts import Answer, FieldValueSource, FilledField, JobRef, Question
-from core.deliver.auth import Authenticator, generate_password
-from core.deliver.engine import RunFormResult
-from core.storage import db, repository
+from autoapply.core.config import DeliverSettings, Settings
+from autoapply.core.contracts import Answer, FieldValueSource, FilledField, JobRef, Question
+from autoapply.core.deliver.auth import Authenticator, generate_password
+from autoapply.core.deliver.engine import RunFormResult
+from autoapply.core.storage import db, repository
 
 
 # ----------------------------------------------------------------------
@@ -250,7 +250,7 @@ class TestRegisterPath:
     def test_verification_question_falls_through_when_no_email_code(self, page, job):
         """邮件迟迟不到（fetch_code 返回 None）时，验证码问题必须原样转发给真正
         的问询通道，绝不能给引擎喂一个空/None 的答案。"""
-        from core.questions.channel import QuestionChannel
+        from autoapply.core.questions.channel import QuestionChannel
 
         page.set_content("<div>signup landing</div>")
         received: dict[str, Any] = {}
@@ -284,7 +284,7 @@ class TestRegisterPath:
         """引擎在 FILLING 过程中把一个「验证码」问题抛给 question_channel——
         _EmailVerifyingChannel 应该拦下来，用 EmailVerifier 自动作答，不转发
         给真正的（本测试里会直接超时的）底层通道。"""
-        from core.questions.channel import TIMEOUT, QuestionChannel
+        from autoapply.core.questions.channel import TIMEOUT, QuestionChannel
 
         class TimeoutChannel(QuestionChannel):
             def ask(self, questions, timeout):

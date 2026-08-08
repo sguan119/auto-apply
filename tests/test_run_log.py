@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from core.storage.run_log import RunLogger
+from autoapply.core.storage.run_log import RunLogger
 
 
 class TestRunLogger:

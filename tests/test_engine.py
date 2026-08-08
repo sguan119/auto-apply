@@ -13,18 +13,18 @@ from typing import Any
 import pytest
 from playwright.sync_api import sync_playwright
 
-from core.bio.store import BioStore
-from core.contracts import Answer, FieldValueSource, JobRef
-from core.deliver.engine import FillEngine
-from core.deliver.selector_cache import SelectorCache
-from core.llm.client import (
+from autoapply.core.bio.store import BioStore
+from autoapply.core.contracts import Answer, FieldValueSource, JobRef
+from autoapply.core.deliver.engine import FillEngine
+from autoapply.core.deliver.selector_cache import SelectorCache
+from autoapply.core.llm.client import (
     ElementDecision,
     LLMClient,
     LLMDecisionError,
     PageContext,
     PageDecision,
 )
-from core.questions.channel import TIMEOUT, AutoAnswerChannel
+from autoapply.core.questions.channel import TIMEOUT, AutoAnswerChannel
 
 
 # ----------------------------------------------------------------------

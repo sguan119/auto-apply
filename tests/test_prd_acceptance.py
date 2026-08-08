@@ -24,9 +24,9 @@ from typing import Any
 import pytest
 from playwright.sync_api import sync_playwright
 
-from core.bio.store import BioStore
-from core.config import BrowserSettings, DeliverSettings, Settings
-from core.contracts import (
+from autoapply.core.bio.store import BioStore
+from autoapply.core.config import BrowserSettings, DeliverSettings, Settings
+from autoapply.core.contracts import (
     Answer,
     DeliveryStatus,
     DeliveryTask,
@@ -34,14 +34,14 @@ from core.contracts import (
     JobRef,
     Question,
 )
-from core.deliver import submit as submit_module
-from core.deliver.adapters.base import select_adapter
-from core.deliver.adapters.workday import WorkdayAdapter
-from core.deliver.auth import generate_password
-from core.deliver.runner import run_delivery
-from core.llm.client import ElementDecision, LLMClient, PageContext, PageDecision
-from core.questions.channel import TIMEOUT, AutoAnswerChannel, QuestionChannel
-from core.storage import db, repository
+from autoapply.core.deliver import submit as submit_module
+from autoapply.core.deliver.adapters.base import select_adapter
+from autoapply.core.deliver.adapters.workday import WorkdayAdapter
+from autoapply.core.deliver.auth import generate_password
+from autoapply.core.deliver.runner import run_delivery
+from autoapply.core.llm.client import ElementDecision, LLMClient, PageContext, PageDecision
+from autoapply.core.questions.channel import TIMEOUT, AutoAnswerChannel, QuestionChannel
+from autoapply.core.storage import db, repository
 
 
 # ======================================================================

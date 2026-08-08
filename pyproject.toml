@@ -25,7 +25,7 @@ dev = [
 ]
 
 [project.scripts]
-deliver = "cli.main:app"
+deliver = "autoapply.cli.main:app"
 
 [tool.setuptools.packages.find]
 where = ["src"]
