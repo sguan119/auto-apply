@@ -1,14 +1,14 @@
-# 全自动投递脚本
+# AutoApply
 
-一个全自动求职投递工具（开源）。整体流程：**搜索职位 → 改写简历 → 自动投递**。
+A fully automated job-application tool (open source). Overall flow: **search jobs → tailor résumé → auto-apply**.
 
-三大模块高度独立，通过明确的数据契约交互：**搜索（search）**、**改简历（resume）**、**投递（deliver）**。当前仓库聚焦 **deliver** 模块的 CLI 版本落地，详见 [`docs/deliver-spec.md`](docs/deliver-spec.md)。
+The three modules interact through explicit data contracts and are highly independent: **search**, **resume**, and **deliver**. This repository currently focuses on landing the CLI version of the **deliver** module — see [`docs/deliver-spec.md`](docs/deliver-spec.md) for details.
 
-## 环境要求
+## Requirements
 
-- Python 3.11+（配置解析用 stdlib `tomllib`，需 3.11 起）。
+- Python 3.11+ (config parsing uses the stdlib `tomllib`, which requires 3.11+).
 
-## 安装
+## Installation
 
 ```bash
 python -m venv .venv
@@ -20,53 +20,49 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-## 配置
+## Configuration
 
-非密钥行为参数放 `config.toml`，密钥放 `.env`（两者均被 `.gitignore` 排除，绝不入仓库）。仓库只提供模板：
-
-```bash
-cp config.example.toml config.toml   # 按需修改投递模式、超时、LLM 命令等
-cp .env.example .env                  # 填入 LLM / CapSolver / IMAP 等真实密钥
-```
-
-未创建 `config.toml` 时，加载逻辑会自动回退到 `config.example.toml`，便于首次跑通。
-
-### LLM 命令要求（重要）
-
-`[llm].command` 配的 CLI 子进程，**stdout 必须是原始 PageDecision JSON 对象**
-——即那一个 `{"decisions": [...], "next_action": ...}`（可选用 ` ```json ` 代码块
-包裹，前后夹带解释性文字也没关系，解析器会抠出对象）。
-
-关键坑：**不要**用 `claude -p --output-format json`。那个 `--output-format json`
-输出的是 Claude Code 的结果信封
-`{"type":"result","result":"…(决策 JSON 被转义成字符串塞进 result)…"}`，
-真正的决策 JSON 藏在 `result` 字符串里、顶层没有 `decisions`/`next_action`，
-解析器会拒收 → 每一页都 `llm_decision_error`，整条链路跑不通。默认值因此用不带
-`--output-format` 的 `claude -p`（直接把模型文本回复打到 stdout，系统提示已要求
-模型只回一个 PageDecision JSON 对象）。
-
-换任何别的 CLI（Gemini CLI、本地模型包装脚本等）同理：只要它把**原始决策 JSON**
-写到 stdout 即可；若某个工具默认要套一层信封，就自己写个薄包装脚本把内层决策
-JSON 透出来，再把 `command` 指向那个脚本。
-
-## 运行
+Non-secret behavioral parameters go in `config.toml`; secrets go in `.env` (both are excluded by `.gitignore` and must never be committed). The repo only ships templates:
 
 ```bash
-deliver --help                          # 查看命令组
-deliver version                         # 打印版本
-
-deliver run --tasks tasks.example.json --manual   # 跑一次投递（默认 manual，见 config.toml）
-deliver run --tasks tasks.example.json --auto --headful  # 自动模式 + 有头浏览器（调试用）
-deliver answer                          # 交互式补答挂起问题（回写 bio，供下次 run 优先重投）
-deliver retry workday R12345            # 手动重投单个 FAILED 职位（决策八：失败默认不自动重试）
-deliver status                          # 打印投递记录 + 挂起问题清单
+cp config.example.toml config.toml   # adjust delivery mode, timeouts, LLM command, etc. as needed
+cp .env.example .env                  # fill in real secrets: LLM / CapSolver / IMAP, etc.
 ```
 
-### tasks.json 格式
+If `config.toml` hasn't been created yet, the loader automatically falls back to `config.example.toml`, so the tool runs out of the box on first try.
 
-`deliver run --tasks` 吃一个 `DeliveryTask[]` 的 JSON 文件（`docs/deliver-spec.md`
-决策五的契约；正常应由搜索 + 改简历模块产出，这里手工写一份用于本地验证），
-形如 `tasks.example.json`：
+### LLM Command Requirements (important)
+
+The CLI subprocess configured under `[llm].command` **must write the raw PageDecision JSON object to stdout** — that single `{"decisions": [...], "next_action": ...}` object (optionally wrapped in a ` ```json ` code fence, with explanatory text before/after being fine too — the parser extracts the object).
+
+Key pitfall: **do not** use `claude -p --output-format json`. That `--output-format json` produces Claude Code's result envelope,
+`{"type":"result","result":"…(decision JSON escaped into a string)…"}`,
+where the real decision JSON is hidden inside the `result` string and there's no top-level `decisions`/`next_action`. The parser rejects it → every page produces `llm_decision_error`, and the whole pipeline breaks. That's why the default is `claude -p` without
+`--output-format` (it writes the model's raw text reply straight to stdout, and the system prompt already instructs the
+model to reply with nothing but a single PageDecision JSON object).
+
+The same applies to any other CLI (Gemini CLI, a local-model wrapper script, etc.): it just needs to write the **raw decision JSON**
+to stdout; if a given tool defaults to wrapping it in an envelope, write a thin wrapper script that unwraps the inner decision
+JSON and point `command` at that script instead.
+
+## Running
+
+```bash
+deliver --help                          # list command groups
+deliver version                         # print the version
+
+deliver run --tasks tasks.example.json --manual   # run a delivery pass (manual is the default, see config.toml)
+deliver run --tasks tasks.example.json --auto --headful  # auto mode + headed browser (for debugging)
+deliver answer                          # interactively answer pending questions (writes back to bio, prioritized on the next run)
+deliver retry workday R12345            # manually retry a single FAILED job (Decision 8: failures don't auto-retry by default)
+deliver status                          # print delivery records + the list of pending questions
+```
+
+### tasks.json Format
+
+`deliver run --tasks` takes a JSON file containing a `DeliveryTask[]` array (the contract from Decision 5 in
+`docs/deliver-spec.md`; normally produced by the search + resume modules, but here it's hand-written for local
+verification), shaped like `tasks.example.json`:
 
 ```json
 [
@@ -85,28 +81,28 @@ deliver status                          # 打印投递记录 + 挂起问题清�
 ]
 ```
 
-`cover_letter_pdf` 可省略/传 `null`。`score` 决定投递顺序（降序）；挂起职位
-补答完问题后会优先于新任务重投，不需要放进这个文件（`deliver run` 每次都会
-自动检查）。
+`cover_letter_pdf` can be omitted or set to `null`. `score` determines delivery order (descending); suspended jobs
+are re-applied ahead of new tasks once their questions are answered, so they don't need to be included in this file
+(`deliver run` checks for them automatically every time).
 
-## 测试
+## Tests
 
 ```bash
 pytest
 ```
 
-## 目录结构
+## Directory Layout
 
 ```
-src/core/    纯 Python 核心包（零界面假设）：契约 / 配置 / 存储 / 投递引擎
-src/cli/     薄命令行入口层
-docs/        PRD 与技术规格（deliver-spec.md 已拍定地基级技术决策）
-data/        运行期数据（bio.yaml / app.db / 简历产物），已 gitignore
-logs/        逐 run 的 JSONL 过程日志，已 gitignore
+src/autoapply/core/    pure Python core package (zero UI assumptions): contracts / config / storage / delivery engine
+src/autoapply/cli/     thin command-line entry layer
+docs/                  PRD and technical spec (deliver-spec.md has the settled foundational decisions)
+data/                  runtime data (bio.yaml / app.db / résumé artifacts), gitignored
+logs/                  per-run JSONL process logs, gitignored
 ```
 
-## 约定
+## Conventions
 
-- **核心逻辑与界面分离**：CLI 与未来 Web 后端共用 `core`，界面只是薄入口。
-- **模块解耦**：跨模块只走数据契约，不产生隐式耦合。
-- **敏感数据绝不入仓库**：密钥、cookie、个人简历、投递记录一律 gitignore。
+- **Separate core logic from the interface**: the CLI and the future Web backend share `core`; the interface is just a thin entry point.
+- **Module decoupling**: cross-module interaction only goes through data contracts — no implicit coupling.
+- **Sensitive data never enters the repo**: secrets, cookies, personal résumés, and delivery records are all gitignored.

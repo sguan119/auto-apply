@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from core.deliver.browser import BrowserSession, apply_action
+from autoapply.core.deliver.browser import BrowserSession, apply_action
 
 
 def test_import_does_not_launch_and_page_before_enter_raises(tmp_path):

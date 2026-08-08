@@ -1,80 +1,80 @@
-# PRD —— 投递模块（deliver）
+# PRD — Deliver Module
 
-> 从 [PRD.md](../PRD.md) 拆出的投递模块详细需求。整体项目背景、三模块关系、bio 模块定义见根 PRD。
-> 本文档只描述「做什么」，不描述「怎么实现」（架构待功能定稿后再议），但技术路线已敲定的部分会明确标注。
+> Detailed requirements for the deliver module, split out from [PRD.md](../PRD.md). See the root PRD for overall project background, how the three modules relate, and the bio module definition.
+> This document only describes *what* to build, not *how* to build it (architecture is discussed once functionality is settled), though sections where the technical direction is already settled are called out explicitly.
 
-## 一、定位
+## 1. Positioning
 
-- 投递模块是流水线的最后一环：`搜索 → 改简历 → 投递`。
-- **输入**：
-  - 搜索模块给出的、带评分且过阈值的职位列表（按分数从高到低排序）；
-  - 改简历模块为每个职位定制生成的 Cover Letter + Resume PDF；
-  - 用户信息模块（bio）——单一事实源。
-- **输出**：投递结果记录（投了哪些职位、每个表单填了什么）；遇到 bio 缺失字段时，用户补充的答案回写回 bio。
-- **核心原则：无人值守，遇阻才问**。默认全自动跑，不打断用户；只有遇到拿不准的字段时才停下来问。
+- The deliver module is the last stage of the pipeline: `search → resume → deliver`.
+- **Input**:
+  - The scored, above-threshold job list from the search module (sorted descending by score);
+  - The cover letter + résumé PDF the resume module tailored for each job;
+  - The bio module — the single source of truth.
+- **Output**: delivery result records (which jobs were applied to, what was filled into each form); when a field is missing from bio, the user's supplied answer is written back to bio.
+- **Core principle: unattended, ask only when blocked.** Runs fully automated by default and never interrupts the user; it only stops to ask when it hits a field it can't confidently fill.
 
-## 二、投递范围
+## 2. Delivery Scope
 
-- **平台范围：仅北美**，与搜索模块（JobSpy）一致。不做国内平台（BOSS 直聘等）——调研阶段收集的国内平台方案仅作架构参考，不进入当前范围。
-- **第一个落地平台：优先 Workday** 雇主门户。选它的原因：Workday 是北美企业最常用的 ATS 之一，且 ApplyPilot 等已有开源项目验证过"LLM+DOM 通用填表"可以覆盖大量 Workday 门户（无需逐家写选择器），适合作为端到端链路的第一站。
-- **登录情况因平台而异**：Easy Apply 需要登录 LinkedIn；多数公司官网直投不需要登录；但 **Workday 通常需要账号**——每个雇主的 Workday 门户是独立账号体系（同一用户在 A 公司注册的账号不能登录 B 公司门户），所以投 Workday 职位时大概率要走"注册/登录"流程（见「六、账号与凭据管理」）。
-- **优先官网投递**：即使有 LinkedIn Easy Apply，也优先去公司官网/ATS 投（Easy Apply 命中率低，常收不到面试）。
-- **要做**：平台站内投递（如 Easy Apply）+ 跳转到公司官网/外部 ATS（Workday / Greenhouse / Lever 等）的投递。
-- **不做**：需要主动发邮件的投递。
-- **Easy Apply 每日上限 ≈ 50 次**（LinkedIn 限制，滚动 24h，Premium 也不放宽，到顶只能走官网）→ 需处理该上限（到顶转官网 / 排队次日）。其余官网/ATS 投递无统一限速，不需要额外限速。
+- **Platform scope: North America only**, matching the search module (JobSpy). Domestic Chinese platforms (BOSS Zhipin, etc.) are out of scope — the domestic-platform approaches gathered during research are kept only as architectural reference, not part of the current scope.
+- **First platform to ship: Workday** employer portals, prioritized. Reason: Workday is one of the most common ATSes among North American employers, and existing open-source projects like ApplyPilot have already validated that "LLM + DOM generic form filling" can cover a large share of Workday portals (without writing per-employer selectors), making it a good first stop for an end-to-end path.
+- **Login requirements vary by platform**: Easy Apply requires a LinkedIn login; most company sites don't require login for a direct application; but **Workday usually requires an account** — each employer's Workday portal has an independent account system (an account registered with Employer A can't log into Employer B's portal), so applying to a Workday job will most likely require going through a "register/log in" flow (see "6. Account and Credential Management").
+- **Prefer the company site for delivery**: even when LinkedIn Easy Apply is available, prefer applying through the company site/ATS instead (Easy Apply has a low hit rate and often doesn't lead to interviews).
+- **In scope**: on-platform delivery (e.g. Easy Apply) + delivery via redirect to a company site/external ATS (Workday / Greenhouse / Lever, etc.).
+- **Out of scope**: applications that require actively sending an email.
+- **Easy Apply daily cap ≈ 50** (a LinkedIn limit, rolling 24h, not relaxed even for Premium; once hit, only the company-site path remains) → this cap needs handling (fall back to the company site / queue for the next day). Other company-site/ATS deliveries have no unified rate limit and don't need extra throttling.
 
-## 三、读页面与填表（技术方案已敲定）
+## 3. Reading Pages and Filling Forms (technical approach settled)
 
-- **不用视觉截图**：截图会让 token 消耗暴涨。
-- **方案：LLM + DOM 结构化理解**（调研见 [research/deliver-scheme-summary.md](research/deliver-scheme-summary.md) 方案 5）：
-  1. 收集当前页面的 DOM，精简 + 编号成可交互元素列表；
-  2. 把编号列表 + bio 交给 LLM，由 LLM 决定每个字段该填什么、填到哪个编号；
-  3. 逐页重复，直到表单填完。
+- **No visual screenshots**: screenshots would blow up token consumption.
+- **Approach: LLM + structured DOM understanding** (see research in [research/deliver-scheme-summary.md](research/deliver-scheme-summary.md), Approach 5):
+  1. Collect the current page's DOM, simplify it, and number the interactive elements;
+  2. Hand the numbered list + bio to the LLM, which decides what to fill into which numbered element;
+  3. Repeat per page until the form is complete.
 
-## 四、字段处理规则
+## 4. Field-Handling Rules
 
-- **开放式问答字段**（如"为什么想加入我们公司"）**不算不确定字段，不阻塞**：直接由 LLM 结合 bio（工作经历、技能、求职偏好等）现场生成回答，无需等用户回答。
-- **不确定字段处理（阻塞式）**：除上述开放式问答外，满足以下任一即视为"拿不准"，停下来问用户：
-  1. 字段在 bio 里**找不到对应信息**（如"是否需要签证担保"）；
-  2. 填了但**信心低**。
-- **流程**：抛出问题给用户 → 用户回答 → 答案**回写到 bio** → **用回写后的信息继续完成当前这个职位的投递**，再投下一个。
+- **Open-ended text questions** (e.g. "Why do you want to join our company") **do not count as uncertain fields and are never blocking**: the LLM generates an answer on the spot using bio (work experience, skills, job preferences, etc.), with no need to wait on the user.
+- **Handling uncertain fields (blocking)**: aside from the open-ended case above, a field is treated as "not confident" — and delivery stops to ask the user — if either of the following holds:
+  1. The field has **no corresponding information in bio** (e.g. "do you require visa sponsorship");
+  2. It was filled, but with **low confidence**.
+- **Flow**: raise the question to the user → the user answers → the answer is **written back to bio** → **the current job's delivery continues using the updated info**, then moves on to the next job.
 
-## 五、验证码/反爬应对（技术方案已敲定）
+## 5. Captcha / Anti-Bot Handling (technical approach settled)
 
-- **方案：参考 ApplyPilot 的做法**（调研见 [research/autofill-tools/01-applypilot.md](research/autofill-tools/01-applypilot.md)）：
-  1. 遇到验证码（hCaptcha / reCAPTCHA / Turnstile / FunCaptcha 等）时，先识别类型和 sitekey；
-  2. 调用第三方打码服务 API（如 CapSolver）求解并注入结果，继续投递流程。
-- **实在过不去（未配置打码服务、或打码失败）：标记该职位投递失败，跳过，继续投下一个**，不阻塞整体流程、不重试。
-- 不自建打码/反检测算法，不做代理池/IP 轮换——这类对抗成本高、收益不确定，不在当前范围内。
+- **Approach: follow ApplyPilot's method** (see research in [research/autofill-tools/01-applypilot.md](research/autofill-tools/01-applypilot.md)):
+  1. When a captcha is hit (hCaptcha / reCAPTCHA / Turnstile / FunCaptcha, etc.), first detect its type and sitekey;
+  2. Call a third-party captcha-solving service API (e.g. CapSolver) to solve it and inject the result, then continue delivery.
+- **When it genuinely can't be solved** (no solving service configured, or solving fails): mark that job's delivery as failed, skip it, and move on to the next one — without blocking the overall run or retrying.
+- No in-house captcha-solving or anti-detection algorithms, no proxy pools/IP rotation — that kind of adversarial work is expensive and its payoff is uncertain, so it's out of scope for now.
 
-## 六、账号与凭据管理
+## 6. Account and Credential Management
 
-- **自动创建账号**：目标平台/ATS（典型如 Workday）需要账号才能投递时，自动完成注册流程——复用「三、读页面与填表」同一套 LLM+DOM 方案填写注册表单，不单独开发一套注册专用逻辑。
-- **邮箱验证码自动获取**：注册/登录过程中若需要邮箱验证码或验证链接，自动读取用户邮箱（**只读权限**）取出验证码/点击验证链接完成验证，不需要用户手动去邮箱里找。
-- **密码生成与记忆**：为每个平台/雇主门户生成并记录一份账号密码，支持 **随机生成** 或 **用户预设模板** 两种方式，用户可选；下次再投同一门户的职位时，直接复用已有账号登录，不重复注册。
-- **存储与安全约束**：
-  - **不加密，本地明文存储**（如 JSON / SQLite）。原因：密码是逐平台随机生成/独立的（不复用用户本人真实密码），泄露单个求职网站账号的实际损失很低，不值得为此引入主密码/密钥库带来的解锁摩擦（会打断"无人值守全自动跑"和 headless/API 模式）。
-  - 唯一硬约束：对应 [CLAUDE.md](../CLAUDE.md) 的关键约束——开源项目，凭据类数据**绝不能提交进代码仓库**，必须被 `.gitignore` 排除（属于架构阶段落实）。
-  - 凭据与 bio 是两类不同的数据：bio 是求职者个人信息（姓名/经历/技能等），凭据是"某个平台的登录态"，两者分开存储，但都由投递模块读写。
+- **Auto-create accounts**: when the target platform/ATS (typically Workday) requires an account to deliver, the registration flow is completed automatically — reusing the same LLM+DOM approach from "3. Reading Pages and Filling Forms" to fill out the registration form, rather than building separate registration-specific logic.
+- **Automatic email verification retrieval**: if registration/login requires an email verification code or link, the user's mailbox is read automatically (**read-only**) to retrieve the code or click the verification link — the user never needs to go check their inbox manually.
+- **Password generation and storage**: a password is generated and recorded for each platform/employer portal, supporting either **random generation** or a **user-defined template**, at the user's choice; the next time a job on the same portal is applied to, the existing account is reused to log in rather than registering again.
+- **Storage and security constraints**:
+  - **Stored locally in plaintext, unencrypted** (e.g. JSON / SQLite). Reason: passwords are randomly generated per platform and independent of one another (never reusing the user's real personal password), so the actual damage from a single job site's account leaking is very low — not worth the friction of a master password/keystore unlock step, which would break the "unattended, fully automated" flow and headless/API modes.
+  - The one hard constraint: matching the critical constraint in [CLAUDE.md](../CLAUDE.md) — this is an open-source project, so credential data **must never be committed to the repo** and must be excluded via `.gitignore` (enforced during the architecture phase).
+  - Credentials and bio are two different kinds of data: bio is the job seeker's personal information (name/experience/skills, etc.), while credentials are "login state for a given platform" — they're stored separately, though both are read and written by the deliver module.
 
-## 七、运行模式
+## 7. Run Modes
 
-- **调用方式**：支持 **API 模式**（作为服务被调用）与 **headless CLI 模式**（无界面命令行跑）两种。
-- **投递方式**：全局开关，支持 **自动投递**（表单填完直接提交）与 **手动投递**（只填表，等用户确认后再提交）两种模式。一次只能选一种，选定后**当次运行的所有职位**都按该模式处理，不支持逐职位切换。**默认手动投递**。
+- **Invocation**: supports both **API mode** (invoked as a service) and **headless CLI mode** (run from the command line with no UI).
+- **Delivery mode**: a global switch supporting **auto-submit** (submits the form as soon as it's filled) and **manual submit** (only fills the form, waiting for user confirmation before submitting). Only one mode can be selected at a time, and once chosen it applies to **every job in that run** — it can't be switched per job. **Manual submit is the default.**
 
-## 八、记录与日志
+## 8. Records and Logging
 
-- **投递结果记录**：记录投了哪些职位、每个表单填了哪些内容、投递成功/失败（含验证码导致的失败）。
-- **成功判定**：以进入平台的**提交确认页**为准——看到确认页即视为投递成功，否则记为失败。
-- **过程日志**：记录运行过程中的关键步骤与异常（如账号注册/登录过程、验证码识别与求解、字段填写决策、报错信息等），用于调试和事后审计，而不仅仅是最终结果。
-- **存储**：本地即可（如 JSON / SQLite + 日志文件），**不需要跨设备同步**。
+- **Delivery result records**: record which jobs were applied to, what was filled into each form, and whether delivery succeeded or failed (including failures caused by captchas).
+- **Success criterion**: defined by reaching the platform's **submission confirmation page** — seeing the confirmation page counts as success, anything else counts as a failure.
+- **Process logs**: record key steps and exceptions during the run (e.g. account registration/login, captcha detection and solving, field-fill decisions, error messages), for debugging and later auditing — not just the final result.
+- **Storage**: local storage is sufficient (e.g. JSON / SQLite + log files); **no cross-device sync is needed**.
 
-## 九、并发
+## 9. Concurrency
 
-- **投递范围**：本次运行把列表里**所有过阈值职位都投一遍**，不设单次投递件数上限。
-- **当前（MVP）**：只支持单 worker——按分数从高到低**顺序逐个投**（一次投一个）。
-- **Future feature：多 worker 并行投递**——遇到 bio 里没有的字段，同样暂停并向用户询问，逻辑与单 worker 一致。
+- **Delivery scope**: each run applies to **every above-threshold job in the list**, with no cap on the number of applications per run.
+- **Current (MVP)**: single-worker only — applies **sequentially, one at a time**, in descending score order.
+- **Future feature: parallel multi-worker delivery** — when a field is missing from bio, the same pause-and-ask logic applies, consistent with the single-worker behavior.
 
-## 十、待敲定
+## 10. Open Items
 
-- **多 worker 的暂停协调细节**（future feature，暂不阻塞当前版本）：多个 worker 并行时，如果两个 worker 同时遇到"同一个字段"缺失（比如都问"是否需要签证担保"），是每个 worker 各自弹一次问题，还是合并成一次问询、一次回写后所有 worker 共享？
+- **Multi-worker pause-coordination details** (future feature, not blocking the current version): when multiple workers run in parallel and two of them hit the same missing field at the same time (e.g. both ask "do you require visa sponsorship"), does each worker pop up its own question, or do they get merged into a single question/single write-back that all workers share?

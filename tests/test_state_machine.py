@@ -6,8 +6,8 @@ from __future__ import annotations
 
 import pytest
 
-from core.contracts import DeliveryStatus as S
-from core.deliver.state_machine import (
+from autoapply.core.contracts import DeliveryStatus as S
+from autoapply.core.deliver.state_machine import (
     TRANSITIONS,
     IllegalTransition,
     JobStateMachine,

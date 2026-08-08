@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from core.contracts import (
+from autoapply.core.contracts import (
     DeliveryRecord,
     DeliveryStatus,
     FieldValueSource,
@@ -18,7 +18,7 @@ from core.contracts import (
     Question,
     RunSummary,
 )
-from core.storage import repository
+from autoapply.core.storage import repository
 
 
 def make_job_ref(**overrides) -> JobRef:
@@ -206,7 +206,7 @@ class TestSuspendedQuestions:
 class TestTransactionIntegrity:
     def test_exception_mid_write_rolls_back_no_partial(self, db_path):
         # connect() 上下文管理器：异常必须回滚，写入的行不得残留。
-        from core.storage import db as db_module
+        from autoapply.core.storage import db as db_module
 
         with pytest.raises(RuntimeError):
             with db_module.connect(db_path) as conn:
@@ -220,7 +220,7 @@ class TestTransactionIntegrity:
 
     def test_save_suspended_questions_is_atomic(self, db_path):
         # executemany 批量插入必须整批原子：中途异常不得留下半批问题。
-        from core.storage import db as db_module
+        from autoapply.core.storage import db as db_module
 
         job = make_job_ref(job_id="job-atomic")
         job_json = job.model_dump_json()
@@ -275,7 +275,7 @@ class TestEasyApplyCount:
         assert repository.easy_apply_count_last_24h(db_path=db_path) == 2
 
     def test_old_entries_excluded_from_window(self, db_path):
-        from core.storage import db as db_module
+        from autoapply.core.storage import db as db_module
 
         repository.increment_easy_apply(db_path=db_path)
         # 手动把一条记录的时间戳改到 25 小时前，模拟窗口外的旧记录。

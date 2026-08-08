@@ -12,11 +12,11 @@ from typing import Any
 import pytest
 from playwright.sync_api import sync_playwright
 
-from core.config import Settings
-from core.contracts import Answer, JobRef, Question
-from core.deliver.adapters.base import PlatformAdapter
-from core.deliver.submit import SubmitResult, confirm_and_submit, is_confirmation_page
-from core.questions.channel import TIMEOUT, QuestionChannel
+from autoapply.core.config import Settings
+from autoapply.core.contracts import Answer, JobRef, Question
+from autoapply.core.deliver.adapters.base import PlatformAdapter
+from autoapply.core.deliver.submit import SubmitResult, confirm_and_submit, is_confirmation_page
+from autoapply.core.questions.channel import TIMEOUT, QuestionChannel
 
 
 # ----------------------------------------------------------------------
@@ -96,7 +96,7 @@ def job() -> JobRef:
 
 
 def make_settings(**deliver_overrides) -> Settings:
-    from core.config import DeliverSettings
+    from autoapply.core.config import DeliverSettings
 
     return Settings(deliver=DeliverSettings(**deliver_overrides))
 
@@ -226,7 +226,7 @@ class TestConfirmationNotDetected:
     def test_submit_click_that_stays_on_form_fails(self, page, job, monkeypatch):
         # 提交按钮点击后页面没有变化（没有确认页信号）——应判 failed，
         # 不应无限等待（缩短轮询预算，测试不用真的等 30 秒）。
-        import core.deliver.submit as submit_module
+        import autoapply.core.deliver.submit as submit_module
 
         monkeypatch.setattr(submit_module, "_CONFIRMATION_POLL_TIMEOUT", 1.0)
         monkeypatch.setattr(submit_module, "_CONFIRMATION_POLL_INTERVAL", 0.1)

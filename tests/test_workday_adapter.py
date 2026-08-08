@@ -11,10 +11,10 @@ from __future__ import annotations
 import pytest
 from playwright.sync_api import sync_playwright
 
-from core.config import Settings
-from core.contracts import JobRef
-from core.deliver.adapters.base import select_adapter
-from core.deliver.adapters.workday import WorkdayAdapter
+from autoapply.core.config import Settings
+from autoapply.core.contracts import JobRef
+from autoapply.core.deliver.adapters.base import select_adapter
+from autoapply.core.deliver.adapters.workday import WorkdayAdapter
 
 
 # ----------------------------------------------------------------------

@@ -14,12 +14,12 @@ from datetime import datetime, timezone
 import pytest
 from typer.testing import CliRunner
 
-import cli.main as main_module
-from core.bio.store import YamlBioStore
-from core.contracts import DeliveryRecord, DeliveryStatus, JobRef, Question, RunSummary
-from core.questions.channel import AutoAnswerChannel
-from core.storage import db, repository
-from cli.terminal_channel import TerminalQuestionChannel
+import autoapply.cli.main as main_module
+from autoapply.core.bio.store import YamlBioStore
+from autoapply.core.contracts import DeliveryRecord, DeliveryStatus, JobRef, Question, RunSummary
+from autoapply.core.questions.channel import AutoAnswerChannel
+from autoapply.core.storage import db, repository
+from autoapply.cli.terminal_channel import TerminalQuestionChannel
 
 runner = CliRunner()
 
@@ -31,7 +31,7 @@ def isolated_storage(tmp_path, monkeypatch):
     # （同 test_auth.py 套路）。
     monkeypatch.setattr(db, "DEFAULT_DB_PATH", tmp_path / "app.db")
     monkeypatch.setattr(main_module, "YamlBioStore", YamlBioStore)
-    import core.bio.store as bio_store_module
+    import autoapply.core.bio.store as bio_store_module
 
     monkeypatch.setattr(bio_store_module, "DEFAULT_BIO_PATH", tmp_path / "bio.yaml")
     yield
