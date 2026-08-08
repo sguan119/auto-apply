@@ -12,8 +12,8 @@ from __future__ import annotations
 import pytest
 from playwright.sync_api import sync_playwright
 
-from core.config import CapsolverSettings, Settings
-from core.deliver.captcha import (
+from autoapply.core.config import CapsolverSettings, Settings
+from autoapply.core.deliver.captcha import (
     CaptchaChallenge,
     CaptchaSolveError,
     CaptchaUnconfigured,
@@ -299,7 +299,7 @@ class TestHandleCaptchaIfPresent:
         assert outcome == "failed"
 
     def test_logs_each_substep(self, page, tmp_path):
-        from core.storage.run_log import RunLogger
+        from autoapply.core.storage.run_log import RunLogger
 
         page.set_content('<div class="h-captcha" data-sitekey="sk"></div>')
         client = FakeCapSolverClient(ready_after=1)

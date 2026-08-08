@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 import yaml
 
-from core.bio.store import YamlBioStore
+from autoapply.core.bio.store import YamlBioStore
 
 
 class TestYamlBioStore:

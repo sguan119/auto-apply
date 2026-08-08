@@ -15,9 +15,9 @@ import time
 
 import pytest
 
-from core.contracts import Answer, JobRef, Question
-from core.questions.channel import TIMEOUT, AutoAnswerChannel, QuestionChannel, Timeout
-from cli.terminal_channel import TerminalQuestionChannel
+from autoapply.core.contracts import Answer, JobRef, Question
+from autoapply.core.questions.channel import TIMEOUT, AutoAnswerChannel, QuestionChannel, Timeout
+from autoapply.cli.terminal_channel import TerminalQuestionChannel
 
 
 def make_job() -> JobRef:

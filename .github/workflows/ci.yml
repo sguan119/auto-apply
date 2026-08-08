@@ -1,0 +1,58 @@
+# 全量测试。测试会真起 chromium（只喂本地 HTML，不发网络请求），所以 CI 必须装浏览器。
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# 同一 PR 连续推送时，取消上一次还在跑的 run
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      # tests 用 `from core...` 导入，必须先 editable 安装
+      - name: Install package
+        run: pip install -e ".[dev]"
+
+      - name: Resolve Playwright version
+        id: pw
+        run: |
+          echo "version=$(python -c 'import importlib.metadata as m; print(m.version("playwright"))')" >> "$GITHUB_OUTPUT"
+
+      # 浏览器二进制约 150MB，缓存键绑 playwright 版本，升级时自动失效
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+
+      - name: Install Chromium (cache miss)
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: playwright install --with-deps chromium
+
+      # 系统级依赖（libnss3 等）装在镜像里、不在缓存路径下，命中缓存时也要单独补
+      - name: Install Chromium system deps (cache hit)
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: playwright install-deps chromium
+
+      - name: Run tests
+        run: pytest -q

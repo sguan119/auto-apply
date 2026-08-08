@@ -16,19 +16,19 @@ from typing import Any
 import pytest
 from playwright.sync_api import sync_playwright
 
-from core.bio.store import BioStore
-from core.config import BrowserSettings, DeliverSettings, Settings
-from core.contracts import (
+from autoapply.core.bio.store import BioStore
+from autoapply.core.config import BrowserSettings, DeliverSettings, Settings
+from autoapply.core.contracts import (
     Answer,
     DeliveryStatus,
     DeliveryTask,
     FieldValueSource,
     JobRef,
 )
-from core.deliver.runner import run_delivery
-from core.llm.client import ElementDecision, LLMClient, PageContext, PageDecision
-from core.questions.channel import TIMEOUT, AutoAnswerChannel
-from core.storage import db, repository
+from autoapply.core.deliver.runner import run_delivery
+from autoapply.core.llm.client import ElementDecision, LLMClient, PageContext, PageDecision
+from autoapply.core.questions.channel import TIMEOUT, AutoAnswerChannel
+from autoapply.core.storage import db, repository
 
 
 # ----------------------------------------------------------------------
@@ -453,7 +453,7 @@ class TestDedup:
     def test_succeeded_key_in_incoming_tasks_is_skipped(self, page, db_path, logs_dir):
         from datetime import datetime, timezone
 
-        from core.contracts import DeliveryRecord
+        from autoapply.core.contracts import DeliveryRecord
 
         job = make_job("job-done")
         repository.record_delivery(
@@ -607,7 +607,7 @@ class TestResumeCrossJob:
     def test_second_job_uploads_its_own_resume_not_the_first(
         self, page, db_path, logs_dir, monkeypatch
     ):
-        from core.deliver import browser as browser_primitives
+        from autoapply.core.deliver import browser as browser_primitives
 
         resume_a = db_path.parent / "resume_a.pdf"
         resume_b = db_path.parent / "resume_b.pdf"

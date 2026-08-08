@@ -15,8 +15,8 @@ from email.message import EmailMessage
 
 import pytest
 
-from core.config import ImapSettings, Settings
-from core.deliver.email_verify import EmailVerifier
+from autoapply.core.config import ImapSettings, Settings
+from autoapply.core.deliver.email_verify import EmailVerifier
 
 
 def make_email_bytes(*, subject: str, sender: str, body: str) -> bytes:

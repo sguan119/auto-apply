@@ -17,10 +17,10 @@ import textwrap
 
 import pytest
 
-from core.config import LLMSettings
-from core.contracts import FieldValueSource, JobRef
-from core.llm.cli_client import CliLLMClient, _extract_json
-from core.llm.client import LLMDecisionError, PageContext, PageDecision, PageElement
+from autoapply.core.config import LLMSettings
+from autoapply.core.contracts import FieldValueSource, JobRef
+from autoapply.core.llm.cli_client import CliLLMClient, _extract_json
+from autoapply.core.llm.client import LLMDecisionError, PageContext, PageDecision, PageElement
 
 _REAL = '{"decisions": [{"element_id": 1, "action": "skip"}], "next_action": "done"}'
 

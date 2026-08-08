@@ -2,85 +2,85 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## 项目简介
+## Project Overview
 
-**全自动投递脚本** —— 一个全自动求职投递工具（开源）。整体流程：**搜索职位 → 改写简历 → 自动投递**。三大模块 **search / resume / deliver** 高度独立，只通过数据契约交互。
+**AutoApply** — a fully automated job-application tool (open source). Overall flow: **search jobs → tailor résumé → auto-apply**. The three modules — **search / resume / deliver** — are highly independent and interact only through data contracts.
 
-**当前仓库聚焦 deliver（投递）模块的 CLI 版本**（Workday-only MVP）；search 与 resume 尚未落地。所有地基级技术决策（含被排除的替代方案与理由）写在 [`docs/deliver-spec.md`](docs/deliver-spec.md) —— **改动架构前先读它**，避免绕回已经讨论过的选型。
+**This repository currently focuses on the CLI version of the deliver module** (Workday-only MVP); search and resume are not yet built. All foundational technical decisions (including rejected alternatives and their rationale) are written up in [`docs/deliver-spec.md`](docs/deliver-spec.md) — **read it before changing the architecture**, to avoid circling back to choices that have already been debated.
 
-## 常用命令
+## Common Commands
 
 ```bash
-# 安装（Python 3.11+，配置解析依赖 stdlib tomllib）
+# Install (Python 3.11+; config parsing relies on stdlib tomllib)
 python -m venv .venv
-.venv\Scripts\activate            # Windows；macOS/Linux 用 source .venv/bin/activate
-pip install -e ".[dev]"           # 装 core/cli 两个包 + pytest；tests 用 `from core...` 导入，必须先装
+.venv\Scripts\activate            # Windows; on macOS/Linux use source .venv/bin/activate
+pip install -e ".[dev]"           # installs the core and cli packages + pytest; tests import `from autoapply.core...`, so install first
 
-# 测试
-pytest                            # 全量
-pytest tests/test_engine.py       # 单文件
-pytest tests/test_runner.py::TestResumeCrossJob            # 单个类
-pytest tests/test_engine.py::TestSelectorCache -k cache    # 单个用例
+# Tests
+pytest                            # full suite
+pytest tests/test_engine.py       # single file
+pytest tests/test_runner.py::TestResumeCrossJob            # single class
+pytest tests/test_engine.py::TestSelectorCache -k cache    # single test
 
-# 运行 deliver CLI（entry point 见 pyproject [project.scripts]）
-deliver run --tasks tasks.example.json --manual   # 跑一次投递（默认 manual）
-deliver run --tasks tasks.example.json --auto --headful   # 自动模式 + 有头浏览器（调试）
-deliver answer                    # 交互补答挂起问题（回写 bio，供下次 run 优先重投）
-deliver retry workday R12345      # 手动重投单个 FAILED 职位（失败默认不自动重试）
-deliver status                    # 打印投递记录 + 挂起问题清单
+# Run the deliver CLI (entry point defined in pyproject [project.scripts])
+deliver run --tasks tasks.example.json --manual   # run a delivery pass (manual is the default)
+deliver run --tasks tasks.example.json --auto --headful   # auto mode + headed browser (for debugging)
+deliver answer                    # interactively answer pending questions (writes back to bio, prioritized on the next run)
+deliver retry workday R12345      # manually retry a single FAILED job (failures don't auto-retry by default)
+deliver status                    # print delivery records + the list of pending questions
 ```
 
-无 lint/format 工具链配置；代码风格跟随现有文件（`from __future__ import annotations`、类型注解、大量中文 docstring 记录"为什么这么做"）。
+No lint/format toolchain is configured; code style follows the existing files (`from __future__ import annotations`, type annotations). All committed content — code, comments, docstrings, commit messages, and docs — is written in English. Existing Chinese comments and docstrings are grandfathered in; translate them opportunistically when the surrounding block is substantially rewritten, never in a sweeping mass-translation commit.
 
-## 配置与密钥
+## Configuration and Secrets
 
-- 非密钥行为参数 → `config.toml`；密钥 → `.env`（两者均 gitignore，**绝不入仓库**）。仓库只给模板：`cp config.example.toml config.toml`、`cp .env.example .env`。
-- 未创建 `config.toml` 时加载逻辑回退到 `config.example.toml`，首次可直接跑通。
-- **`[llm].command` 的 CLI 子进程，stdout 必须是原始 `PageDecision` JSON 对象**（`{"decisions":[...], "next_action":...}`，可用 ```json 代码块包裹）。**不要**用 `claude -p --output-format json`——那会套一层 Claude Code 结果信封，决策 JSON 被转义进 `result` 字符串，解析器拒收 → 每页 `llm_decision_error`。默认用不带 `--output-format` 的 `claude -p`。换别的 CLI 同理：只要 stdout 是裸决策 JSON 即可，否则写个薄包装脚本透出内层。
+- Non-secret behavioral parameters go in `config.toml`; secrets go in `.env` (both are gitignored — **never commit either**). The repo ships templates only: `cp config.example.toml config.toml`, `cp .env.example .env`.
+- If `config.toml` hasn't been created yet, the loader falls back to `config.example.toml`, so the tool runs out of the box on first try.
+- **The `[llm].command` CLI subprocess must write the raw `PageDecision` JSON object to stdout** (`{"decisions":[...], "next_action":...}`, optionally wrapped in a ```json code fence). **Do not** use `claude -p --output-format json` — that wraps the output in a Claude Code result envelope, which escapes the decision JSON into a `result` string that the parser rejects, producing `llm_decision_error` on every page. The default is `claude -p` without `--output-format`. The same applies to any other CLI: as long as stdout is the bare decision JSON it works; otherwise write a thin wrapper script that unwraps the inner payload.
 
-## 架构大图
+## Architecture Overview
 
-分三层，接缝对应 spec 决策二"核心逻辑与界面分离"：
+Three layers, with the seam matching spec Decision 2, "separate core logic from the interface":
 
 ```
-入口层   cli/ (typer, 薄)              未来 Web 后端 (FastAPI, 薄)
-              └──────────────┬──────────────┘
-核心层        src/core/  （纯 Python 包，零界面假设）
+Entry layer   src/autoapply/cli/ (typer, thin)         Future Web backend (FastAPI, thin)
+                       └──────────────┬──────────────┘
+Core layer          src/autoapply/core/  (pure Python package, zero UI assumptions)
 ```
 
-**`cli/main.py` 每个命令只做「解析参数 → 调 core 函数 → 格式化打印」**，真正的编排/存储/浏览器逻辑全在 core。加功能时逻辑进 core，不要堆进 CLI。
+**Every command in `src/autoapply/cli/main.py` only does "parse args → call a core function → format and print"** — all real orchestration, storage, and browser logic lives in core. When adding a feature, put the logic in core; don't pile it into the CLI.
 
-### 投递引擎的心脏：DOM → LLM → Playwright 逐页循环（spec 决策四）
+### The heart of the delivery engine: the DOM → LLM → Playwright per-page loop (spec Decision 4)
 
-这是自研执行架构，不用视觉截图、不用 Agent-MCP。数据流：
+This is a bespoke execution architecture — no visual screenshots, no Agent-MCP. Data flow:
 
-1. **`deliver/dom.py`** `collect_page(page)` —— 把当前页 DOM 精简 + 给每个可交互元素编号，产出 `PageSnapshot`（含 `selector_map`：编号 → Playwright 选择器）。
-2. **`llm/client.py` / `cli_client.py`** —— `LLMClient.decide(PageContext)` 让 LLM 对整页决策「填哪个编号、填什么、值来源（BIO/LLM_GENERATED/USER_ANSWER）」，返回 `PageDecision`（`actionable` + `uncertain`/needs_user + `next_action`）。
-3. **`deliver/browser.py`** `apply_action()` —— 用 Playwright 执行决策（可搜索下拉自动分流「键入+Enter」）。
-4. **`deliver/engine.py`** `FillEngine.run_form()` —— 驱动上面三步逐页循环，直到 `completed`/`suspended`/`failed`。**engine 只认注入的抽象接口**（`LLMClient`/`BioStore`/`QuestionChannel`/`RunLogger`），不导入 state_machine/repository，只返回结构化 `RunFormResult`。
+1. **`src/autoapply/core/deliver/dom.py`** `collect_page(page)` — simplifies the current page's DOM and numbers every interactive element, producing a `PageSnapshot` (including a `selector_map`: number → Playwright selector).
+2. **`src/autoapply/core/llm/client.py` / `cli_client.py`** — `LLMClient.decide(PageContext)` has the LLM make a decision for the whole page ("which numbered element to fill, what value, and the value's source: BIO/LLM_GENERATED/USER_ANSWER"), returning a `PageDecision` (`actionable` + `uncertain`/needs_user + `next_action`).
+3. **`src/autoapply/core/deliver/browser.py`** `apply_action()` — executes the decision with Playwright (searchable dropdowns are automatically routed to a "type + Enter" flow).
+4. **`src/autoapply/core/deliver/engine.py`** `FillEngine.run_form()` — drives the three steps above in a per-page loop until `completed`/`suspended`/`failed`. **The engine only knows about injected abstract interfaces** (`LLMClient`/`BioStore`/`QuestionChannel`/`RunLogger`) — it doesn't import state_machine/repository, and only returns a structured `RunFormResult`.
 
-**选择器缓存（`deliver/selector_cache.py`）** 是省 token 补丁：键 = 页面**结构指纹**（不含 value）。关键安全边界见 `engine._is_cross_job_cacheable()`——含 `LLM_GENERATED` 填值或 `upload` 动作的页面**绝不跨职位缓存**（否则会把 A 职位的求职信/简历重放到 B 职位，真实错投 bug，回归测试 `test_runner.py::TestResumeCrossJob`）。
+**The selector cache (`src/autoapply/core/deliver/selector_cache.py`)** is a token-saving patch: the key is the page's **structural fingerprint** (excludes values). See `engine._is_cross_job_cacheable()` for the critical safety boundary — pages with an `LLM_GENERATED` fill value or an `upload` action are **never cached across jobs** (otherwise a cover letter/résumé from job A could get replayed onto job B — a real misdelivery bug; regression test at `test_runner.py::TestResumeCrossJob`).
 
-### 状态机 + 编排（spec 决策六/七/八）
+### State Machine + Orchestration (spec Decisions 6/7/8)
 
-- **`deliver/state_machine.py`** —— 单职位 8 状态：`PENDING → OPENING → AUTHENTICATING → FILLING ⇄ WAITING_USER → READY_TO_SUBMIT → SUBMITTING → CONFIRMING → SUCCEEDED`；任意阶段失败 → `FAILED(reason)`；`WAITING_USER` 超时 → `SUSPENDED`（非终态，可恢复）。
-- **`deliver/runner.py`** `run_delivery()` —— **唯一编排入口**，串起全部构件按精确顺序驱动每个职位的状态机，产出 `RunSummary`。模块顶部 docstring 有 outcome→DeliveryStatus 的逐字映射，改编排前先读。
-- **恢复 = 从头重投，不恢复浏览器现场**。挂起可能跨天，保留 Playwright context 不现实；重投前表单未提交、操作幂等，且答案已回写 bio，理论上不会再卡同一字段。
-- **持久化纪律**：`repository.record_delivery()` 只在终态或 SUSPENDED 时调一次，绝不在中途状态调用。
+- **`src/autoapply/core/deliver/state_machine.py`** — 8 states per job: `PENDING → OPENING → AUTHENTICATING → FILLING ⇄ WAITING_USER → READY_TO_SUBMIT → SUBMITTING → CONFIRMING → SUCCEEDED`; failure at any stage → `FAILED(reason)`; `WAITING_USER` timeout → `SUSPENDED` (non-terminal, recoverable).
+- **`src/autoapply/core/deliver/runner.py`** `run_delivery()` — **the single orchestration entry point**, wiring up every component in exact order to drive each job's state machine, producing a `RunSummary`. The module's top-of-file docstring has the literal outcome→DeliveryStatus mapping — read it before touching orchestration.
+- **Recovery = re-applying from scratch, not resuming the browser session.** A suspension can span days, so keeping a Playwright context alive isn't realistic; the form hasn't been submitted yet, actions are idempotent, and the answer has already been written back to bio, so in theory it won't get stuck on the same field again.
+- **Persistence discipline**: `repository.record_delivery()` is called exactly once, only at a terminal state or SUSPENDED — never mid-state.
 
-### 关键抽象（可替换的接缝）
+### Key Abstractions (replaceable seams)
 
-- **平台适配层 `deliver/adapters/`** —— 只有「从职位 URL 走到表单第一页 / 判断是否要登录」这段（状态机 OPENING）因平台而异，无法通用推断，故单独切一层。`base.py` 的 `PlatformAdapter` ABC 刻意保持小；新增平台 = 写子类 + `@register_adapter` + 在 `adapters/__init__.py` 加一行 import，`select_adapter()` 不用改。**FILLING 本身仍是通用的**，不经过适配层。
-- **问询通道 `questions/channel.py`** —— `QuestionChannel.ask(questions, timeout)` 抽象。CLI 实现 = 终端交互（`cli/terminal_channel.py`）；自动模式 = `AutoAnswerChannel`（答不上来直接挂起）；未来 Web = WebSocket/SSE。按页批量问询，超时挂起该职位继续下一个。
-- **LLM 客户端 `llm/`** —— `LLMClient` 抽象，首个实现 `CliLLMClient` 走 headless CLI 子进程（见上「配置与密钥」）。
+- **Platform adapter layer `src/autoapply/core/deliver/adapters/`** — only the segment from "job URL to the form's first page / decide whether login is needed" (the OPENING state) varies by platform and can't be generalized, so it's cut into its own layer. `base.py`'s `PlatformAdapter` ABC is deliberately kept small; adding a platform means writing a subclass + `@register_adapter` + adding one import line in `adapters/__init__.py` — `select_adapter()` doesn't need to change. **FILLING itself stays generic** and doesn't go through the adapter layer.
+- **Question channel `src/autoapply/core/questions/channel.py`** — the `QuestionChannel.ask(questions, timeout)` abstraction. The CLI implementation is terminal interaction (`src/autoapply/cli/terminal_channel.py`); auto mode uses `AutoAnswerChannel` (suspends immediately when it can't answer); a future Web implementation would use WebSocket/SSE. Questions are batched per page; on timeout, the job is suspended and the run continues with the next one.
+- **LLM client `src/autoapply/core/llm/`** — the `LLMClient` abstraction, with `CliLLMClient` as the first implementation, running a headless CLI subprocess (see "Configuration and Secrets" above).
 
-### 数据契约与存储（spec 决策五/九）
+### Data Contracts and Storage (spec Decisions 5/9)
 
-- **契约在 `core/contracts.py`**（pydantic 模型）：`JobRef`（唯一键 `(platform, job_id)`）、`DeliveryTask`（deliver 输入：job + resume_pdf/cover_letter_pdf 路径）、`DeliveryRecord`（输出）、`RunSummary`、`Question`/`Answer`/`BioWriteback`/`FilledField`。**增删字段必须同步改 spec 决策五**。PDF 等大文件只传路径不进对象体。`core/export_schemas.py` 把契约导出到 `docs/contracts/*.json` 供文档参考。
-- **存储按数据形态分工**：`data/app.db`（SQLite，`storage/repository.py`：投递记录/凭据/挂起问题/run 记录，需按键查询去重）+ `data/bio.yaml`（`bio/store.py`，用户手工维护的单一事实源，须人类可读）+ `logs/run-<run_id>.jsonl`（`storage/run_log.py`，逐 run 追加的过程审计日志）+ `data/artifacts/<platform>/<job_id>/`（简历产物）。
-- **模块解耦硬约束**：跨模块只走 core 接口（如搜索模块用 `get_delivered_job_keys()` 查已投列表去重），不直读对方存储。
-- `data/`、`logs/`、`.env`、`config.toml`、简历/cover-letter **一律 gitignore**（敏感数据绝不入仓库）。
+- **Contracts live in `src/autoapply/core/contracts.py`** (pydantic models): `JobRef` (unique key `(platform, job_id)`), `DeliveryTask` (deliver's input: job + resume_pdf/cover_letter_pdf paths), `DeliveryRecord` (output), `RunSummary`, `Question`/`Answer`/`BioWriteback`/`FilledField`. **Adding or removing fields must be reflected in spec Decision 5 at the same time.** Large files like PDFs are only passed as paths, never embedded in the object body. `src/autoapply/core/export_schemas.py` exports the contracts to `docs/contracts/*.json` for documentation reference.
+- **Storage is split by data shape**: `data/app.db` (SQLite, `storage/repository.py`: delivery records/credentials/pending questions/run records — needs key-based lookups for deduplication) + `data/bio.yaml` (`bio/store.py`, the user's hand-maintained single source of truth, must be human-readable) + `logs/run-<run_id>.jsonl` (`storage/run_log.py`, an append-only process audit log per run) + `data/artifacts/<platform>/<job_id>/` (résumé artifacts).
+- **Hard constraint on module decoupling**: cross-module access only goes through core interfaces (e.g., the search module uses `get_delivered_job_keys()` to query already-applied jobs for deduplication) — never read another module's storage directly.
+- `data/`, `logs/`, `.env`, `config.toml`, résumés/cover letters are **all gitignored** (sensitive data must never enter the repo).
 
-## 路线图
+## Roadmap
 
-CLI（当前）→ Website（core 之上加 FastAPI + 前端）→ Docker 发布。search / resume 两模块待落地。spec「待续」列出的后续议题：非-Workday 平台适配抽象、bio schema、DOM 精简/选择器缓存细节、多 worker 暂停协调。
+CLI (current) → Website (FastAPI + frontend on top of core) → Docker release. The search and resume modules are not yet built. Follow-up topics listed as "open" in the spec: non-Workday platform adapter abstraction, bio schema, DOM simplification/selector cache implementation details, multi-worker pause coordination.
