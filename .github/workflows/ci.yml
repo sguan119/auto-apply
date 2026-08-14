@@ -1,0 +1,21 @@
+name: Documentation
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify documentation structure
+        run: |
+          test -f PRD.md
+          test -f README.md
+          test -f CLAUDE.md
+          test -d docs
