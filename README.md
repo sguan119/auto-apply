@@ -1,3 +1,5 @@
+> **Repository structure:** Product requirements and planning documents live on `main`. The current automatic web-application implementation is preserved on the [`auto-web-apply`](https://github.com/sguan119/auto-apply/tree/auto-web-apply) branch.
+
 # AutoApply
 
 A fully automated job-application tool (open source). Overall flow: **search jobs → tailor résumé → auto-apply**.
