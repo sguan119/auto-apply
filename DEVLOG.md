@@ -54,3 +54,29 @@
   3. Defaulted **Include already-seen jobs** (`seen_lookback_hours = 0`) on the test page, returned `llm_error` on skip/fail, and painted it on the page instead of only `llm kept —`.
 * **Verification:** Run dumps: 10:57 traceback matched missing `base_url`; 11:27 `candidates.json` was 17× `already_seen`. `pytest tests/test_search_ui.py tests/test_search_runner.py` — 16 passed (toggle, `include_seen`, empty-shortlist `llm_error`). Live DeepSeek keep/drop after restart not re-run in this session.
 
+## 2026-08-22 | Resume-query search entry [RESOLVED] #Search #LLM
+* **Context/Scope:** `docs/search-resume-query.md`, `src/autoapply/core/search/resume_query.py`, `rerank.py`, `runner.py`, `src/autoapply/cli/search.py`, `src/autoapply/web/search.html`
+* **Objective:** Add a second search entry that turns a résumé into board queries, without replacing `search run -k` or rewriting Gate A/B.
+* **Roadblock(s):**
+  1. [RESOLVED] “Decode résumé → match jobs” looked like a matcher rewrite; LLM-ing the catalog or retuning `gates.py` would break the locked funnel and cost bound.
+  2. [RESOLVED] Planning 2–3 LinkedIn-style titles collapses a dual track (UX/product + game/level) into synonyms and is the wrong JobSpy input.
+  3. [RESOLVED] PDF extract quality (two-column layout) would mix with query quality; writing inferred titles into `bio.yaml` would start the resume/bio schema on an experiment.
+* **Solution/Pivots:**
+  1. Locked it as a **query planner**: résumé text → 3–5 short board terms → human edit → existing `run_search` → existing shortlist rerank with a `resume` excerpt. Keyword `search run` unchanged.
+  2. Prompted for cluster diversity and skill-blocklisted queries (`figma`, `unreal`, …); `yoe_guess` is display-only. CLI `search from-resume` plans only unless `--run`; UI Propose queries fills Keywords.
+  3. Refused `.pdf` in v1 (paste / `.txt` / `.md` only). Plan is ephemeral (`data/search/resume_plan.json`); bio is not written.
+* **Verification:** Search-module pytest 78 passed (no live LLM/JobSpy). Live DeepSeek plan-only on a dual-track fixture (5s): `interaction designer`, `product designer`, `level designer`, `game designer`; clusters product/ux + game/level. Fetch (`--run`) not dogfooded this session.
+* **Commit:** 5f4ea19
+
+## 2026-08-22 | Uncommitted search MVP vs branch switch [RESOLVED] #Git
+* **Context/Scope:** branches `search` (`37b2183`) and `search-resume-query` (`5f4ea19`)
+* **Objective:** Keep the unpublished search MVP while opening an experimental branch — then recover when `search` looked empty.
+* **Roadblock(s):**
+  1. [RESOLVED] Search MVP lived only in the working tree; `search` itself never got a commit, so it still points at pre-search `37b2183`.
+  2. [RESOLVED] Cursor Source Control committed `resume v0.1.0` on `search-resume-query` at 13:01 (no remembered terminal `git commit`); checkout `search` 6s later cleared Changed files and `search` CLI (`ModuleNotFoundError: autoapply.cli.search`).
+* **Solution/Pivots:**
+  1. Treated the empty `search` working tree as checkout-to-old-tip, not a wipe: `__pycache__` still had `runner` / `gates` / `resume_query`.
+  2. Confirmed `5f4ea19` on `search-resume-query` (also `origin/search-resume-query`) holds the 51-file snapshot. Switching back restores the files; merging that commit is what would put MVP onto `search`.
+* **Verification:** `git log search-resume-query -1` = `5f4ea19`; `git diff --stat search...search-resume-query` = 51 files / +5711. On `search`, `search --help` failed missing `autoapply.cli.search`.
+* **Commit:** 5f4ea19
+
