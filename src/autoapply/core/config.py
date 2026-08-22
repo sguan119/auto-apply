@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import tomllib
 from pathlib import Path
+from typing import Literal
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
@@ -32,24 +33,21 @@ class DeliverSettings(BaseModel):
 class LLMSettings(BaseModel):
     """LLM 客户端配置，对应 config.toml 的 [llm] 段 + 环境变量密钥。
 
-    决策十「LLM 可插拔」要求配置只需 model+base_url+key 三个知常量；`command`
-    是首个实现（headless CLI，阶段 4）特有的额外知常量，HTTP/SDK 实现落地后
-    不需要它。`base_url` 目前只按需透传给 CLI 子进程环境变量，供支持自定义
-    endpoint 的 CLI/包装脚本读取；`command` 里若含 `{model}` 占位符会被
-    `model` 值替换，具体传参方式取决于 command 本身（config.example.toml
-    有说明）。
+    决策十「LLM 可插拔」：`transport` 选择怎么调用模型。
+    `cli`（默认）跑 `[llm].command` 子进程；`http` 打 OpenAI 兼容的
+    Chat Completions（DeepSeek / OpenAI / Groq 等），密钥走 `LLM_API_KEY`。
 
-    ⚠️ `command` 的 stdout 必须是【原始 PageDecision JSON】对象，不能是套一层
-    的 agent 信封——`claude -p --output-format json` 会把决策 JSON 转义进
-    `{"type":"result","result":"..."}` 的 result 字符串里，解析器拒收、每页都
-    llm_decision_error；故默认用不带 `--output-format` 的 `claude -p`（直接输出
-    模型文本，系统提示已要求模型只回一个 PageDecision JSON）。详见
-    config.example.toml [llm].command 注释与 README「LLM 命令要求」。
+    `command` 仅 `cli` 模式需要。`base_url` 在 `http` 模式是请求地址；
+    在 `cli` 模式仍会透传给子进程环境变量 `LLM_BASE_URL`。
+
+    ⚠️ CLI 的 stdout / HTTP 的 message content 必须是业务 JSON 原文
+    （投递：PageDecision；搜索：ranked），不能是 Claude Code 信封。
     """
 
+    transport: Literal["cli", "http"] = "cli"
     command: str = "claude -p"
     model: str = "claude-opus-4-8"
-    base_url: str | None = None  # 非密钥，可插拔 LLM 的自定义 endpoint（决策十）
+    base_url: str | None = None  # HTTP endpoint host; also passed to CLI as LLM_BASE_URL
     timeout: int = 60  # decide() 单次调用超时秒数，避免 CLI 子进程卡死拖垮整个 run
     api_key: str | None = None  # 来自环境变量 LLM_API_KEY，密钥不放 config.toml
 
@@ -77,6 +75,25 @@ class ImapSettings(BaseModel):
     poll_timeout: float = 120.0  # 轮询总超时秒数，超时返回 None（调用方降级处理）
 
 
+class SearchSettings(BaseModel):
+    """Search fetch/filter knobs, matching config.toml `[search]` (docs/search-spec.md §4.2)."""
+
+    sites: list[str] = Field(
+        default_factory=lambda: ["linkedin", "indeed", "glassdoor", "zip_recruiter"]
+    )
+    results_wanted: int = 100  # per site per keyword; rate-limit cap, not a relevance filter
+    hours_old: int = 72
+    score_threshold: float = 0.35  # Gate B; unused until the filter step
+    shortlist_cap: int = 20
+    llm_rerank: bool = True
+    llm_timeout: int = 180  # one rerank call for the whole shortlist
+    llm_model: str | None = None  # optional cheaper override of [llm].model
+    llm_transport: Literal["cli", "http"] | None = None  # optional override of [llm].transport
+    country_indeed: str = "USA"
+    remote: bool = False  # bio `preferences.remote` overrides when set
+    seen_lookback_hours: int = 168  # 7 days; skip keys already stored in search_seen
+
+
 class CapsolverSettings(BaseModel):
     """CapSolver 打码服务配置，对应 config.toml 的 [capsolver] 段 + 环境变量密钥。
 
@@ -94,6 +111,7 @@ class Settings(BaseModel):
     """合并后的全局配置：config.toml 行为参数 + .env/环境变量密钥。"""
 
     deliver: DeliverSettings = Field(default_factory=DeliverSettings)
+    search: SearchSettings = Field(default_factory=SearchSettings)
     llm: LLMSettings = Field(default_factory=LLMSettings)
     browser: BrowserSettings = Field(default_factory=BrowserSettings)
     imap: ImapSettings = Field(default_factory=ImapSettings)
@@ -110,7 +128,7 @@ def load_settings(
       保证还没做本地配置时也能跑通。
     - `env_path` 缺省时尝试加载仓库根的 `.env`；文件不存在也不报错，直接退回读取真实的
       进程环境变量（`.env` 只是本地开发的便利手段）。
-    - 任何一段（[deliver]/[llm]/[imap]）在 config.toml 里缺失都不报错，用 Settings 默认值兜底。
+    - 任何一段（[deliver]/[search]/[llm]/[imap]）在 config.toml 里缺失都不报错，用 Settings 默认值兜底。
     """
     resolved_config_path = _resolve_config_path(config_path)
     raw_config: dict = {}
@@ -134,6 +152,7 @@ def load_settings(
 
     return Settings(
         deliver=raw_config.get("deliver", {}),
+        search=raw_config.get("search", {}),
         llm=llm_section,
         browser=raw_config.get("browser", {}),
         imap=imap_section,

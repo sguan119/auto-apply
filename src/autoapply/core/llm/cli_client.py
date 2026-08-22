@@ -29,16 +29,14 @@ CLI 的常见行为），`_extract_json()` 负责从中抠出 JSON 对象文本�
 from __future__ import annotations
 
 import json
-import os
 import re
-import shlex
-import subprocess
 from typing import Any
 
 from pydantic import ValidationError
 
 from autoapply.core.config import LLMSettings
 from autoapply.core.llm.client import LLMClient, LLMDecisionError, PageContext, PageDecision
+from autoapply.core.llm.transport import LLMTransportError, complete_prompt
 
 _SYSTEM_PROMPT = """你是求职投递工具的表单填写决策引擎。
 你会收到一页表单的精简 DOM（编号元素列表 PageContext.elements）、职位信息（job）、
@@ -167,21 +165,16 @@ def _extract_json(text: str) -> str:
 
 
 def _split_command(command: str) -> list[str]:
-    """把 config 里的命令字符串切成 `subprocess.run` 的 argv 列表。
+    """Compatibility wrapper; command splitting lives in transport.split_command."""
+    from autoapply.core.llm.transport import split_command
 
-    Windows 上可执行文件/脚本路径常含反斜杠（如 `C:\\Users\\...\\claude.cmd`），
-    `shlex.split` 的 POSIX 模式会把反斜杠当转义符处理，切坏路径；这里按平台
-    选 `posix` 参数——Windows 用非 POSIX 规则（反斜杠保留原样，双引号仍能加
-    空格参数），其它平台用标准 POSIX 规则处理引号与转义。
-    """
-    return shlex.split(command, posix=(os.name != "nt"))
+    return split_command(command)
 
 
 class CliLLMClient(LLMClient):
-    """`LLMClient` 的首个实现：把决策请求转成 prompt，走无头 CLI 子进程。
+    """`LLMClient` 的首个实现：把决策请求转成 prompt，再按 [llm].transport 调用模型。
 
-    对 CLI 本身不做任何假设——只知道「喂 stdin，读 stdout 的 JSON」；换成
-    Gemini CLI、本地模型包装脚本等任意同构命令都能接，符合决策十「可插拔」。
+    `cli`：无头 CLI 子进程（默认 `claude -p`）。`http`：OpenAI 兼容 HTTP。
     """
 
     def __init__(self, settings: LLMSettings) -> None:
@@ -189,39 +182,10 @@ class CliLLMClient(LLMClient):
 
     def decide(self, page_context: PageContext) -> PageDecision:
         prompt = _build_prompt(page_context)
-        argv = self._build_argv()
-        env = self._build_env()
-
         try:
-            result = subprocess.run(
-                argv,
-                input=prompt,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                timeout=self._settings.timeout,
-                env=env,
-            )
-        except subprocess.TimeoutExpired as exc:
-            raise LLMDecisionError(
-                f"LLM CLI 超时（{self._settings.timeout}s）：{self._settings.command!r}"
-            ) from exc
-        except OSError as exc:
-            raise LLMDecisionError(
-                f"LLM CLI 启动失败：{self._settings.command!r}：{exc}"
-            ) from exc
-
-        if result.returncode != 0:
-            raise LLMDecisionError(
-                f"LLM CLI 非零退出码 {result.returncode}：{self._settings.command!r}\n"
-                f"stderr: {result.stderr.strip()}\nstdout: {result.stdout.strip()}"
-            )
-
-        stdout = result.stdout.strip()
-        if not stdout:
-            raise LLMDecisionError(
-                f"LLM CLI 输出为空：{self._settings.command!r}\nstderr: {result.stderr.strip()}"
-            )
+            stdout = complete_prompt(prompt, self._settings)
+        except LLMTransportError as exc:
+            raise LLMDecisionError(str(exc)) from exc
 
         try:
             json_text = _extract_json(stdout)
@@ -237,19 +201,3 @@ class CliLLMClient(LLMClient):
             raise LLMDecisionError(
                 f"LLM CLI 输出的 JSON 不符合 PageDecision schema：{exc}\n原始输出: {stdout}"
             ) from exc
-
-    def _build_argv(self) -> list[str]:
-        # 用字面替换而非 str.format：命令里若含其它花括号（如某些 JSON 形态的
-        # 参数）不会被误当成占位符而抛 KeyError。
-        command = self._settings.command.replace("{model}", self._settings.model)
-        return _split_command(command)
-
-    def _build_env(self) -> dict[str, str]:
-        """密钥/模型信息通过子进程 env 传，不拼进命令行（见模块文档字符串）。"""
-        env = dict(os.environ)
-        env["LLM_MODEL"] = self._settings.model
-        if self._settings.api_key:
-            env["LLM_API_KEY"] = self._settings.api_key
-        if self._settings.base_url:
-            env["LLM_BASE_URL"] = self._settings.base_url
-        return env

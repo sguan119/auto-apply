@@ -1,0 +1,13 @@
+# bio.example.yaml — template for data/bio.yaml (gitignored).
+# Copy to data/bio.yaml and fill in. Search reads the preferences slice below;
+# the rest of bio is owned by the bio module and is not locked here.
+
+preferences:
+  target_role_keywords:
+    - product designer
+    - UX designer
+  locations:
+    - Toronto, ON
+  remote: true
+  yoe_prefer_min: 0
+  yoe_prefer_max: 3

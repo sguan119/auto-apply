@@ -15,31 +15,49 @@ password_generation_mode = "random"
 # Password template used in template mode; "{rand}" is replaced with a random alphanumeric string; ignored in random mode
 password_template = "Deliver{rand}!2026"
 
+[search]
+# Job boards passed to JobSpy (North America MVP). Google Jobs is optional; Bayt/Naukri/BDJobs are out of scope.
+sites = ["linkedin", "indeed", "glassdoor", "zip_recruiter"]
+# Per site per keyword. Caps fetch volume; Layer 1 still uses loose keywords.
+results_wanted = 100
+hours_old = 72
+# Indeed/Glassdoor country. JobSpy accepts "USA" / "usa".
+country_indeed = "USA"
+# Gate B threshold and LLM shortlist cap.
+score_threshold = 0.35
+shortlist_cap = 20
+llm_rerank = true
+# One rerank call for the whole shortlist (not per job). Prefer a cheap model; Opus is too expensive for batches of JDs.
+llm_timeout = 180
+# Optional overrides so search can use a cheap HTTP API while deliver keeps local Claude CLI.
+# llm_transport = "http"
+# llm_model = "deepseek-chat"
+# Resume-query planner (`search from-resume`) uses the same transport/model overrides.
+# Search rerank uses [llm].transport. CLI stdout / HTTP message must be the raw
+# {"ranked":[...]} object (optionally in a json fence) — not a PageDecision and not a Claude Code envelope.
+# Skip jobs already stored in search_seen within this many hours (default 7 days).
+seen_lookback_hours = 168
+# Default remote flag when bio `preferences.remote` is unset.
+remote = false
+
 [llm]
-# Command for invoking the headless CLI subprocess (Decision 4: the first LLMClient implementation runs a headless CLI).
+# How to call the model:
+#   "cli"  — run the command below (default: local Claude Code `claude -p`)
+#   "http" — OpenAI-compatible Chat Completions. Put the key in .env as LLM_API_KEY
+#            and set base_url + model (DeepSeek, OpenAI, Groq, …).
+transport = "cli"
+# Command for the CLI transport (ignored when transport = "http").
 #
-# ⚠️ Key constraint: the command must write the 【raw PageDecision JSON】 to stdout — that single
-# {"decisions": [...], "next_action": ...} object itself (optionally wrapped in a ```json code fence,
-# with explanatory text before/after being fine — the parser extracts the object). It **cannot** be an
-# "agent envelope" that wraps the decision in another layer. In particular, `claude -p --output-format json` produces
-# Claude Code's result envelope {"type":"result","result":"...(decision JSON escaped into a string)..."},
-# where the decision JSON is hidden inside the result string with no top-level decisions/next_action field,
-# so the parser rejects it → every page gets llm_decision_error. That's why the default is `claude -p`
-# without --output-format: it writes the model's text reply straight to stdout, and the system prompt already
-# requires the model to reply with nothing but a single PageDecision JSON object, which satisfies the
-# constraint above exactly. The same applies to any other CLI (Gemini CLI, a local-model wrapper script,
-# etc.) — as long as its stdout is the raw decision JSON.
-#
-# If the command string contains a "{model}" placeholder it gets substituted with the model value below, e.g.
-# command = "claude -p --model {model}"; when there's no placeholder, model is still passed to the subprocess via
-# the LLM_MODEL environment variable — how it's used is up to the command itself.
+# ⚠️ The model text must be the raw business JSON (deliver: PageDecision; search: {"ranked":[...]}).
+# Do not use `claude -p --output-format json` — that wraps the payload in a Claude Code envelope.
 command = "claude -p"
-# Model name, passed to the CLI alongside command (see above)
+# Model name. CLI: substituted for {model} in command and passed as LLM_MODEL.
+# HTTP: sent as the Chat Completions "model" field (e.g. "deepseek-chat").
 model = "claude-opus-4-8"
-# Optional: a custom endpoint for pluggable LLMs (Decision 10's model+base_url+key); not a secret,
-# passed through to the CLI subprocess via the LLM_BASE_URL environment variable as needed; leave blank to use command's own default
-# base_url = ""
-# Timeout in seconds for a single decide() call, so a hung CLI subprocess doesn't stall the whole run
+# HTTP: API host, e.g. "https://api.deepseek.com" or "https://api.openai.com/v1".
+# CLI: optional, forwarded to the subprocess as LLM_BASE_URL.
+# base_url = "https://api.deepseek.com"
+# Timeout in seconds for one CLI run or one HTTP request
 timeout = 60
 
 [browser]

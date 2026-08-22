@@ -1,0 +1,91 @@
+{
+  "description": "Normalized posting inside search (docs/search-spec.md §5). Adapter output / gate input.\n\nRicher than JobRef: keeps description and location for filtering and review.\nJobRef is the later-module subset and must not grow JD text.",
+  "properties": {
+    "platform": {
+      "title": "Platform",
+      "type": "string"
+    },
+    "job_id": {
+      "title": "Job Id",
+      "type": "string"
+    },
+    "url": {
+      "format": "uri",
+      "maxLength": 2083,
+      "minLength": 1,
+      "title": "Url",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "company": {
+      "title": "Company",
+      "type": "string"
+    },
+    "location": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Location"
+    },
+    "description": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Description"
+    },
+    "date_posted": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Date Posted"
+    },
+    "extracted_yoe": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Extracted Yoe"
+    },
+    "yoe_is_preferred": {
+      "default": false,
+      "title": "Yoe Is Preferred",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "platform",
+    "job_id",
+    "url",
+    "title",
+    "company"
+  ],
+  "title": "SearchJob",
+  "type": "object"
+}

@@ -19,6 +19,9 @@ from autoapply.core.contracts import (
     JobRef,
     Question,
     RunSummary,
+    SearchCandidate,
+    SearchJob,
+    SearchRunSummary,
 )
 
 
@@ -59,6 +62,55 @@ class TestJobRef:
         job = make_job_ref()
         restored = JobRef.model_validate_json(job.model_dump_json())
         assert restored == job
+
+
+class TestSearchJob:
+    def test_construct_valid(self):
+        job = SearchJob(
+            platform="linkedin",
+            job_id="abc",
+            url="https://example.com/jobs/abc",
+            title="Product Designer",
+            company="Acme",
+            location="Toronto, ON",
+            description="A role.",
+        )
+        assert job.key == ("linkedin", "abc")
+        assert job.extracted_yoe is None
+
+    def test_dump_json_round_trip(self):
+        job = SearchJob(
+            platform="indeed",
+            job_id="x",
+            url="https://example.com/jobs/x",
+            title="UX Designer",
+            company="Globex",
+        )
+        restored = SearchJob.model_validate_json(job.model_dump_json())
+        assert restored == job
+
+
+class TestSearchCandidate:
+    def test_inherits_job_fields(self):
+        candidate = SearchCandidate(
+            platform="linkedin",
+            job_id="1",
+            url="https://example.com/jobs/1",
+            title="UX Designer",
+            company="Acme",
+            score=0.7,
+            prefilter_rank=1,
+        )
+        assert candidate.key == ("linkedin", "1")
+        assert candidate.selected is False
+
+
+class TestSearchRunSummary:
+    def test_defaults(self):
+        summary = SearchRunSummary(run_id="r1", fetched=3, after_dedupe=3)
+        assert summary.dropped_gate_a == 0
+        assert summary.llm_kept is None
+        assert summary.selected == 0
 
 
 class TestFilledField:

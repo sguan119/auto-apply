@@ -59,6 +59,54 @@ class JobRef(BaseModel):
         return (self.platform, self.job_id)
 
 
+class SearchJob(BaseModel):
+    """Normalized posting inside search (docs/search-spec.md §5). Adapter output / gate input.
+
+    Richer than JobRef: keeps description and location for filtering and review.
+    JobRef is the later-module subset and must not grow JD text.
+    """
+
+    platform: str
+    job_id: str
+    url: HttpUrl
+    title: str
+    company: str
+    location: str | None = None
+    description: str | None = None
+    date_posted: datetime | None = None
+    extracted_yoe: int | None = None
+    yoe_is_preferred: bool = False
+
+    @property
+    def key(self) -> tuple[str, str]:
+        return (self.platform, self.job_id)
+
+
+class SearchCandidate(SearchJob):
+    """A job after dedupe + gates (docs/search-spec.md §5). Shown in review."""
+
+    score: float = 0.0
+    drop_reason: str | None = None
+    prefilter_rank: int | None = None
+    llm_keep: bool | None = None
+    llm_rank: int | None = None
+    llm_reason: str | None = None
+    selected: bool = False
+
+
+class SearchRunSummary(BaseModel):
+    """One search run's counts (docs/search-spec.md §5)."""
+
+    run_id: str
+    fetched: int
+    after_dedupe: int
+    dropped_gate_a: int = 0
+    shortlisted: int = 0
+    llm_kept: int | None = None
+    selected: int = 0
+    failed_reason: str | None = None
+
+
 class FilledField(BaseModel):
     """FILLING 阶段填入的单个表单字段记录（spec 决策五 DeliveryRecord 注释）。"""
 

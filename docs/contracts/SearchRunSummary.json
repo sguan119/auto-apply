@@ -1,0 +1,63 @@
+{
+  "description": "One search run's counts (docs/search-spec.md §5).",
+  "properties": {
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "fetched": {
+      "title": "Fetched",
+      "type": "integer"
+    },
+    "after_dedupe": {
+      "title": "After Dedupe",
+      "type": "integer"
+    },
+    "dropped_gate_a": {
+      "default": 0,
+      "title": "Dropped Gate A",
+      "type": "integer"
+    },
+    "shortlisted": {
+      "default": 0,
+      "title": "Shortlisted",
+      "type": "integer"
+    },
+    "llm_kept": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Llm Kept"
+    },
+    "selected": {
+      "default": 0,
+      "title": "Selected",
+      "type": "integer"
+    },
+    "failed_reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Failed Reason"
+    }
+  },
+  "required": [
+    "run_id",
+    "fetched",
+    "after_dedupe"
+  ],
+  "title": "SearchRunSummary",
+  "type": "object"
+}

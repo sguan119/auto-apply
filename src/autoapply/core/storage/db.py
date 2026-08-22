@@ -73,6 +73,36 @@ CREATE TABLE IF NOT EXISTS easy_apply_count (
 );
 CREATE INDEX IF NOT EXISTS idx_easy_apply_count_created_at
     ON easy_apply_count (created_at);
+
+CREATE TABLE IF NOT EXISTS search_runs (
+    run_id TEXT PRIMARY KEY,
+    started_at TEXT NOT NULL,
+    finished_at TEXT,
+    is_current INTEGER NOT NULL DEFAULT 0,
+    keywords_json TEXT NOT NULL DEFAULT '[]',
+    summary_json TEXT NOT NULL DEFAULT '{}'
+);
+
+CREATE TABLE IF NOT EXISTS search_candidates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id TEXT NOT NULL,
+    platform TEXT NOT NULL,
+    job_id TEXT NOT NULL,
+    job_json TEXT NOT NULL,
+    score REAL,
+    drop_reason TEXT,
+    prefilter_rank INTEGER,
+    UNIQUE (run_id, platform, job_id)
+);
+CREATE INDEX IF NOT EXISTS idx_search_candidates_run
+    ON search_candidates (run_id);
+
+CREATE TABLE IF NOT EXISTS search_seen (
+    platform TEXT NOT NULL,
+    job_id TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL,
+    PRIMARY KEY (platform, job_id)
+);
 """
 
 
