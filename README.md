@@ -31,19 +31,14 @@ cp .env.example .env                  # fill in real secrets: LLM / CapSolver / 
 
 If `config.toml` hasn't been created yet, the loader automatically falls back to `config.example.toml`, so the tool runs out of the box on first try.
 
-### LLM Command Requirements (important)
+### LLM (cli vs your own API key)
 
-The CLI subprocess configured under `[llm].command` **must write the raw PageDecision JSON object to stdout** — that single `{"decisions": [...], "next_action": ...}` object (optionally wrapped in a ` ```json ` code fence, with explanatory text before/after being fine too — the parser extracts the object).
+`[llm].transport` chooses how the model is called:
 
-Key pitfall: **do not** use `claude -p --output-format json`. That `--output-format json` produces Claude Code's result envelope,
-`{"type":"result","result":"…(decision JSON escaped into a string)…"}`,
-where the real decision JSON is hidden inside the `result` string and there's no top-level `decisions`/`next_action`. The parser rejects it → every page produces `llm_decision_error`, and the whole pipeline breaks. That's why the default is `claude -p` without
-`--output-format` (it writes the model's raw text reply straight to stdout, and the system prompt already instructs the
-model to reply with nothing but a single PageDecision JSON object).
+- **`cli`** (default) — run `[llm].command`, by default local Claude Code `claude -p`.
+- **`http`** — OpenAI-compatible Chat Completions. Put the key in `.env` as `LLM_API_KEY`, set `[llm].base_url` and `[llm].model` (DeepSeek, OpenAI, Groq, …). Search can override with `[search].llm_transport` / `[search].llm_model` so ranking uses a cheap API while deliver still uses Claude CLI.
 
-The same applies to any other CLI (Gemini CLI, a local-model wrapper script, etc.): it just needs to write the **raw decision JSON**
-to stdout; if a given tool defaults to wrapping it in an envelope, write a thin wrapper script that unwraps the inner decision
-JSON and point `command` at that script instead.
+The model reply **must be the raw business JSON** (deliver: `PageDecision`; search: `{"ranked":[...]}`), optionally in a ` ```json ` fence. **Do not** use `claude -p --output-format json` — that wraps the payload in a Claude Code envelope and the parser rejects it.
 
 ## Running
 

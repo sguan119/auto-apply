@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AutoApply Search</title>
+  <style>
+    :root {
+      --bg: #f4f1ea;
+      --ink: #1c1917;
+      --muted: #57534e;
+      --card: #fffcf7;
+      --line: #e7e0d4;
+      --accent: #1d4ed8;
+      --accent-ink: #fff;
+      --warn: #9a3412;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font: 15px/1.45 "Segoe UI", system-ui, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+    }
+    main {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 32px 20px 64px;
+    }
+    h1 { font-size: 1.4rem; font-weight: 650; margin: 0 0 6px; }
+    .lede { color: var(--muted); margin: 0 0 24px; }
+    form {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px;
+      display: grid;
+      gap: 12px;
+      grid-template-columns: 1fr 1fr auto;
+      align-items: end;
+    }
+    label { display: grid; gap: 6px; font-size: 12px; color: var(--muted); }
+    textarea {
+      font: inherit;
+      color: var(--ink);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+      background: #fff;
+      min-height: 140px;
+      resize: vertical;
+    }
+    .resume-card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px;
+      display: grid;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .resume-card h2 { margin: 0; }
+    .resume-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    input[type="text"] {
+      font: inherit;
+      color: var(--ink);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+      background: #fff;
+    }
+    .opts { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
+    .llm-box { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+    .seg {
+      display: none;
+      gap: 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .seg.visible { display: inline-flex; }
+    .hint { font-size: 12px; color: var(--muted); margin: 0; }
+    button {
+      font: inherit;
+      font-weight: 600;
+      background: var(--accent);
+      color: var(--accent-ink);
+      border: 0;
+      border-radius: 8px;
+      padding: 9px 16px;
+      cursor: pointer;
+      height: 38px;
+    }
+    button.secondary {
+      background: #fff;
+      color: var(--ink);
+      border: 1px solid var(--line);
+    }
+    .seg button {
+      height: 32px;
+      padding: 0 12px;
+      border: 0;
+      border-radius: 0;
+      background: #fff;
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 12px;
+    }
+    .seg button[aria-pressed="true"] {
+      background: var(--accent);
+      color: var(--accent-ink);
+    }
+    .toolbar { display: flex; gap: 10px; align-items: center; margin: 8px 0 12px; }
+    .keep-yes { color: #166534; font-weight: 600; }
+    .keep-no { color: var(--muted); }
+    .stats { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 12px; }
+    .chip {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12px;
+    }
+    .err { color: var(--warn); margin: 12px 0; }
+    table { width: 100%; border-collapse: collapse; background: var(--card); }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { font-size: 12px; color: var(--muted); font-weight: 600; }
+    a { color: var(--accent); }
+    h2 { font-size: 1rem; margin: 28px 0 8px; }
+    .empty { color: var(--muted); }
+    @media (max-width: 720px) {
+      form { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>AutoApply Search</h1>
+    <p class="lede">Local test UI. Fetches jobs, filters a shortlist, does not apply. Quick mode pulls fewer results so a first try is faster. Keyword search is unchanged; the résumé panel below is an experimental query planner.</p>
+    <form id="form">
+      <label>Keywords
+        <input id="keywords" type="text" value="product designer" placeholder="product designer, UX designer" />
+      </label>
+      <label>Locations
+        <input id="locations" type="text" value="Toronto, ON" placeholder="Toronto, ON" />
+      </label>
+      <button type="submit" id="go">Search</button>
+      <div class="opts">
+        <label style="display:flex;flex-direction:row;align-items:center;gap:8px;">
+          <input id="quick" type="checkbox" checked />
+          Quick test (about 12 results per board)
+        </label>
+        <label style="display:flex;flex-direction:row;align-items:center;gap:8px;">
+          <input id="include-seen" type="checkbox" checked />
+          Include already-seen jobs (re-test the same query)
+        </label>
+        <div class="llm-box">
+          <label style="display:flex;flex-direction:row;align-items:center;gap:8px;">
+            <input id="llm" type="checkbox" />
+            LLM rerank shortlist
+          </label>
+          <div id="transport" class="seg" role="group" aria-label="How to call the model">
+            <button type="button" id="via-http" aria-pressed="true">Custom API</button>
+            <button type="button" id="via-cli" aria-pressed="false">Claude CLI</button>
+          </div>
+          <p id="transport-hint" class="hint" hidden>
+            Custom API uses <code>LLM_API_KEY</code> + <code>[llm].base_url</code> (e.g. DeepSeek). Claude CLI uses local <code>claude -p</code>.
+          </p>
+        </div>
+      </div>
+    </form>
+    <section class="resume-card">
+      <h2>From résumé (experimental)</h2>
+      <p class="hint">Paste plain text. Propose queries fills Keywords above — edit them, then Search. Does not write bio. PDF is not supported yet. Uses the Custom API / Claude CLI toggle under LLM rerank (defaults to Custom API).</p>
+      <label>Résumé text
+        <textarea id="resume" placeholder="Paste a .txt / .md résumé…"></textarea>
+      </label>
+      <div class="resume-actions">
+        <button type="button" class="secondary" id="decode">Propose queries</button>
+        <span id="plan-status" class="lede" style="margin:0;"></span>
+      </div>
+      <p id="plan-notes" class="hint" hidden></p>
+    </section>
+    <p id="status" class="lede" hidden></p>
+    <p id="error" class="err" hidden></p>
+    <div id="stats" class="stats" hidden></div>
+    <h2>Shortlist</h2>
+    <div class="toolbar">
+      <button type="button" class="secondary" id="pick" disabled>Save picks</button>
+      <span id="pick-status" class="lede" style="margin:0;"></span>
+    </div>
+    <div id="shortlist"><p class="empty">Run a search to see jobs here.</p></div>
+    <h2>Filtered out</h2>
+    <div id="dropped"><p class="empty">Dropped jobs and reasons will show after a run.</p></div>
+  </main>
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    let lastRunId = null;
+    let lastPlan = null;
+    let llmTransport = "http";
+
+    function syncTransportUi() {
+      const on = $("llm").checked;
+      $("transport").classList.toggle("visible", on);
+      $("transport-hint").hidden = !on;
+      $("via-http").setAttribute("aria-pressed", String(llmTransport === "http"));
+      $("via-cli").setAttribute("aria-pressed", String(llmTransport === "cli"));
+    }
+
+    $("llm").addEventListener("change", syncTransportUi);
+    $("via-http").addEventListener("click", () => {
+      llmTransport = "http";
+      syncTransportUi();
+    });
+    $("via-cli").addEventListener("click", () => {
+      llmTransport = "cli";
+      syncTransportUi();
+    });
+
+    function splitTerms(value) {
+      return value.split(/[,;]/).map((s) => s.trim()).filter(Boolean);
+    }
+
+    function esc(value) {
+      return String(value ?? "").replace(/[&<>"']/g, (c) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[c]));
+    }
+
+    function keepLabel(job) {
+      if (job.llm_keep === true) return `<span class="keep-yes">yes</span>`;
+      if (job.llm_keep === false) return `<span class="keep-no">no</span>`;
+      return "";
+    }
+
+    function rankOf(job) {
+      return job.llm_rank ?? job.prefilter_rank ?? "";
+    }
+
+    function rows(items, dropped) {
+      if (!items.length) return `<p class="empty">None.</p>`;
+      if (dropped) {
+        const body = items.map((job) => `
+          <tr>
+            <td>${esc(job.drop_reason || "")}</td>
+            <td>${Number(job.score ?? 0).toFixed(2)}</td>
+            <td>${esc(job.platform)}</td>
+            <td>${job.url ? `<a href="${esc(job.url)}" target="_blank" rel="noreferrer">${esc(job.title)}</a>` : esc(job.title)}</td>
+            <td>${esc(job.company)}</td>
+            <td>${esc(job.location)}</td>
+          </tr>
+        `).join("");
+        return `<table>
+          <thead><tr><th>Reason</th><th>Score</th><th>Board</th><th>Title</th><th>Company</th><th>Location</th></tr></thead>
+          <tbody>${body}</tbody>
+        </table>`;
+      }
+      const body = items.map((job) => {
+        const key = `${job.platform}:${job.job_id}`;
+        return `
+          <tr>
+            <td><input type="checkbox" class="pick-box" data-key="${esc(key)}" /></td>
+            <td>${esc(rankOf(job))}</td>
+            <td>${keepLabel(job)}</td>
+            <td>${Number(job.score ?? 0).toFixed(2)}</td>
+            <td>${esc(job.platform)}</td>
+            <td>${job.url ? `<a href="${esc(job.url)}" target="_blank" rel="noreferrer">${esc(job.title)}</a>` : esc(job.title)}</td>
+            <td>${esc(job.company)}</td>
+            <td>${esc(job.location)}</td>
+            <td>${esc(job.llm_reason || "")}</td>
+          </tr>
+        `;
+      }).join("");
+      return `<table>
+        <thead><tr><th></th><th>Rank</th><th>Keep</th><th>Score</th><th>Board</th><th>Title</th><th>Company</th><th>Location</th><th>Reason</th></tr></thead>
+        <tbody>${body}</tbody>
+      </table>`;
+    }
+
+    $("form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      $("error").hidden = true;
+      $("go").disabled = true;
+      $("pick").disabled = true;
+      $("pick-status").textContent = "";
+      $("status").hidden = false;
+      $("status").textContent = $("llm").checked
+        ? (llmTransport === "http"
+          ? "Searching and reranking via Custom API…"
+          : "Searching and reranking via Claude CLI…")
+        : "Searching… this can take a few minutes.";
+      try {
+        const response = await fetch("/api/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            keywords: splitTerms($("keywords").value),
+            locations: splitTerms($("locations").value),
+            quick: $("quick").checked,
+            llm_rerank: $("llm").checked,
+            llm_transport: $("llm").checked ? llmTransport : null,
+            include_seen: $("include-seen").checked,
+            resume_excerpt: lastPlan?.resume_summary || null,
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || "Search failed");
+        }
+        const s = data.summary || {};
+        lastRunId = s.run_id || null;
+        const seenN = (data.dropped || []).filter((j) => j.drop_reason === "already_seen").length;
+        $("stats").hidden = false;
+        $("stats").innerHTML = [
+          `run ${esc(s.run_id || "")}`,
+          `fetched ${s.fetched ?? 0}`,
+          `after dedupe ${s.after_dedupe ?? 0}`,
+          `shortlisted ${s.shortlisted ?? 0}`,
+          `llm kept ${s.llm_kept ?? "—"}`,
+          seenN ? `already seen ${seenN}` : null,
+          `dropped ${data.dropped_total ?? 0}`,
+        ].filter(Boolean).map((t) => `<span class="chip">${t}</span>`).join("");
+        $("shortlist").innerHTML = rows(data.shortlist || [], false);
+        $("dropped").innerHTML = rows(data.dropped || [], true);
+        $("pick").disabled = !(data.shortlist || []).length;
+        if (data.llm_error) {
+          $("error").hidden = false;
+          $("error").textContent = data.llm_error;
+        }
+        $("status").textContent = data.output_dir
+          ? `Wrote ${data.output_dir}`
+          : "Done.";
+      } catch (err) {
+        $("error").hidden = false;
+        $("error").textContent = err.message || String(err);
+        $("status").textContent = "";
+      } finally {
+        $("go").disabled = false;
+      }
+    });
+
+    $("decode").addEventListener("click", async () => {
+      $("error").hidden = true;
+      $("plan-notes").hidden = true;
+      $("decode").disabled = true;
+      $("plan-status").textContent = llmTransport === "cli"
+        ? "Planning queries via Claude CLI…"
+        : "Planning queries via Custom API…";
+      try {
+        const response = await fetch("/api/resume-plan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            resume_text: $("resume").value,
+            llm_transport: llmTransport,
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || "Resume plan failed");
+        }
+        lastPlan = data;
+        $("keywords").value = (data.queries || []).join(", ");
+        const bits = [];
+        if (data.clusters?.length) bits.push("clusters: " + data.clusters.join(" | "));
+        if (data.yoe_guess) {
+          bits.push(`yoe guess ${data.yoe_guess.min ?? "?"}–${data.yoe_guess.max ?? "?"} (not applied)`);
+        }
+        if (data.notes) bits.push(data.notes);
+        $("plan-notes").hidden = !bits.length;
+        $("plan-notes").textContent = bits.join(" · ");
+        $("plan-status").textContent = "Queries filled in Keywords. Edit them, then Search.";
+      } catch (err) {
+        $("error").hidden = false;
+        $("error").textContent = err.message || String(err);
+        $("plan-status").textContent = "";
+      } finally {
+        $("decode").disabled = false;
+      }
+    });
+
+    $("pick").addEventListener("click", async () => {
+      const keys = [...document.querySelectorAll(".pick-box:checked")].map((el) => el.dataset.key);
+      $("error").hidden = true;
+      if (!keys.length) {
+        $("error").hidden = false;
+        $("error").textContent = "Check at least one shortlist job before saving picks.";
+        return;
+      }
+      $("pick").disabled = true;
+      try {
+        const response = await fetch("/api/pick", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ job_keys: keys, run_id: lastRunId }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || "Pick failed");
+        }
+        $("pick-status").textContent = `Saved ${data.selected.length} job(s) → ${data.path}`;
+      } catch (err) {
+        $("error").hidden = false;
+        $("error").textContent = err.message || String(err);
+      } finally {
+        $("pick").disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

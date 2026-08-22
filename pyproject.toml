@@ -16,16 +16,27 @@ dependencies = [
     "pyyaml",
     "python-dotenv",
     "httpx",
+    "python-jobspy",  # JobSpy: fetch postings from LinkedIn/Indeed/Glassdoor/ZipRecruiter
     # 邮箱验证码取回：优先用 stdlib imaplib，暂不额外引 imapclient 依赖。
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest",
+    "fastapi",
+    "uvicorn",
+]
+web = [
+    "fastapi",
+    "uvicorn",
 ]
 
 [project.scripts]
 deliver = "autoapply.cli.main:app"
+search = "autoapply.cli.search:app"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"autoapply.web" = ["*.html"]

@@ -19,6 +19,9 @@ from autoapply.core import contracts
 # 已内嵌在引用它们的模型 schema 里，不必单独导出。
 _EXPORTED_MODELS = [
     contracts.JobRef,
+    contracts.SearchJob,
+    contracts.SearchCandidate,
+    contracts.SearchRunSummary,
     contracts.FilledField,
     contracts.DeliveryTask,
     contracts.DeliveryRecord,

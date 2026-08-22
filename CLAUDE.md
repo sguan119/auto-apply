@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **AutoApply** — a fully automated job-application tool (open source). Overall flow: **search jobs → tailor résumé → auto-apply**. The three modules — **search / resume / deliver** — are highly independent and interact only through data contracts.
 
-**This repository currently focuses on the CLI version of the deliver module** (Workday-only MVP); search and resume are not yet built. All foundational technical decisions (including rejected alternatives and their rationale) are written up in [`docs/deliver-spec.md`](docs/deliver-spec.md) — **read it before changing the architecture**, to avoid circling back to choices that have already been debated.
+**This repository currently ships the CLI version of the deliver module** (Workday-only MVP). Search is specified in [`docs/search-spec.md`](docs/search-spec.md) and implemented on the `search` branch; resume is not yet built. Foundational deliver decisions are in [`docs/deliver-spec.md`](docs/deliver-spec.md). **Read the matching spec before changing search or deliver architecture**, to avoid circling back to choices that have already been debated.
 
 ## Common Commands
 
@@ -22,6 +22,16 @@ pytest tests/test_engine.py       # single file
 pytest tests/test_runner.py::TestResumeCrossJob            # single class
 pytest tests/test_engine.py::TestSelectorCache -k cache    # single test
 
+# Run the search CLI (entry point defined in pyproject [project.scripts])
+search run -k "product designer" -l "Toronto, ON"   # fetch → gates → optional LLM rerank
+search run --no-llm                                 # skip LLM; Gate B order only
+search list                                         # reprint current shortlist
+search pick --id linkedin:abc --id indeed:xyz       # write data/search/selected.json (JobRef[])
+search pick --kept                                  # pick every LLM keep=true job
+search ui                                           # local test page (does not apply)
+search from-resume resume.md                        # experimental: propose board queries from a résumé
+search from-resume resume.md --run                  # plan then fetch with those queries
+
 # Run the deliver CLI (entry point defined in pyproject [project.scripts])
 deliver run --tasks tasks.example.json --manual   # run a delivery pass (manual is the default)
 deliver run --tasks tasks.example.json --auto --headful   # auto mode + headed browser (for debugging)
@@ -36,7 +46,7 @@ No lint/format toolchain is configured; code style follows the existing files (`
 
 - Non-secret behavioral parameters go in `config.toml`; secrets go in `.env` (both are gitignored — **never commit either**). The repo ships templates only: `cp config.example.toml config.toml`, `cp .env.example .env`.
 - If `config.toml` hasn't been created yet, the loader falls back to `config.example.toml`, so the tool runs out of the box on first try.
-- **The `[llm].command` CLI subprocess must write the raw `PageDecision` JSON object to stdout** (`{"decisions":[...], "next_action":...}`, optionally wrapped in a ```json code fence). **Do not** use `claude -p --output-format json` — that wraps the output in a Claude Code result envelope, which escapes the decision JSON into a `result` string that the parser rejects, producing `llm_decision_error` on every page. The default is `claude -p` without `--output-format`. The same applies to any other CLI: as long as stdout is the bare decision JSON it works; otherwise write a thin wrapper script that unwraps the inner payload.
+- **Deliver / search LLM:** `[llm].transport` is `cli` (default: local `claude -p`) or `http` (OpenAI-compatible API; key in `.env` as `LLM_API_KEY`, plus `[llm].base_url` / `model`). Search may override with `[search].llm_transport` and `[search].llm_model` (e.g. DeepSeek for ranking, Claude CLI for form-fill). CLI stdout / HTTP message must be the raw business JSON — **do not** use `claude -p --output-format json`.
 
 ## Architecture Overview
 
@@ -83,4 +93,4 @@ This is a bespoke execution architecture — no visual screenshots, no Agent-MCP
 
 ## Roadmap
 
-CLI (current) → Website (FastAPI + frontend on top of core) → Docker release. The search and resume modules are not yet built. Follow-up topics listed as "open" in the spec: non-Workday platform adapter abstraction, bio schema, DOM simplification/selector cache implementation details, multi-worker pause coordination.
+CLI (current) → Website (FastAPI + frontend on top of core) → Docker release. Search MVP = fetch + filter + human pick ([`docs/search-spec.md`](docs/search-spec.md)); resume is not yet built. Follow-up topics listed as "open" in the deliver spec: non-Workday platform adapter abstraction, bio schema, DOM simplification/selector cache implementation details, multi-worker pause coordination.

@@ -45,6 +45,7 @@ Job boards' own search is quite inaccurate and easily misses matching jobs. So t
    - The exact scoring/filtering algorithm is **TBD** (LLM / rules / hybrid), but **cost must be controllable** (this runs on a schedule at volume, so it can't burn money).
 
 - Output: a scored job list (flagging which ones are above the threshold).
+- **Current MVP (search branch):** stop after search + **human review** (user picks which jobs to pursue). Resume tailoring and auto-apply are later, and only run on picked jobs. Detailed decisions, architecture, tech stack, and acceptance criteria: [docs/search-spec.md](docs/search-spec.md).
 
 ## 4. Resume Module
 
